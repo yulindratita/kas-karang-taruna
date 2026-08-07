@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, FileSpreadsheet, FileText, Filter, User } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, FileText, Calendar, User } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -18,21 +18,28 @@ export default function Laporan() {
   const [transaksiFilter, setTransaksiFilter] = useState<any[]>([]);
   const [adminEmail, setAdminEmail] = useState('');
   
-  // State Filter (Default: Bulan & Tahun saat ini)
-  const [bulan, setBulan] = useState(new Date().getMonth() + 1); // 1 - 12
-  const [tahun, setTahun] = useState(new Date().getFullYear());
+  // State Filter Tanggal (Default: 1 Januari tahun ini s/d hari ini)
+  const tahunIni = new Date().getFullYear();
+  const hariIni = new Date().toISOString().split('T')[0];
+  const awalTahun = `${tahunIni}-01-01`;
+
+  const [tanggalMulai, setTanggalMulai] = useState(awalTahun);
+  const [tanggalSelesai, setTanggalSelesai] = useState(hariIni);
 
   // State Ringkasan
   const [summary, setSummary] = useState({ pemasukan: 0, pengeluaran: 0, saldo: 0 });
 
+  // Fungsi Format Mata Uang
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
-  const namaBulan = [
-    "Semua Bulan", "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
+  // Fungsi Format Tanggal untuk Cetak (Misal: 2024-01-01 menjadi 1 Januari 2024)
+  const formatTanggalIndo = (tglStr: string) => {
+    if (!tglStr) return '-';
+    const date = new Date(tglStr);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,7 +54,7 @@ export default function Laporan() {
       const { data } = await supabase
         .from('transaksi')
         .select(`*, kegiatan ( nama_kegiatan )`)
-        .order('tanggal_transaksi', { ascending: false });
+        .order('tanggal_transaksi', { ascending: true });
 
       if (data) {
         setTransaksiMentah(data);
@@ -57,14 +64,17 @@ export default function Laporan() {
     fetchData();
   }, [router]);
 
+  // LOGIC FILTER RENTANG TANGGAL
   useEffect(() => {
     if (transaksiMentah.length === 0) return;
 
     const dataTersaring = transaksiMentah.filter((t) => {
-      const [y, m] = t.tanggal_transaksi.split('-');
-      const filterTahun = parseInt(y) === tahun;
-      const filterBulan = bulan === 0 ? true : parseInt(m) === bulan; 
-      return filterTahun && filterBulan;
+      // Pastikan ada nilai default jika input tanggal kosong
+      const start = tanggalMulai || '1970-01-01';
+      const end = tanggalSelesai || '2100-12-31';
+      
+      // Filter rentang: >= tanggal mulai DAN <= tanggal selesai
+      return t.tanggal_transaksi >= start && t.tanggal_transaksi <= end;
     });
 
     setTransaksiFilter(dataTersaring);
@@ -77,10 +87,10 @@ export default function Laporan() {
     });
 
     setSummary({ pemasukan: masuk, pengeluaran: keluar, saldo: masuk - keluar });
-  }, [transaksiMentah, bulan, tahun]);
+  }, [transaksiMentah, tanggalMulai, tanggalSelesai]);
 
 
-  // EKSPOR EXCEL (Dengan Urutan Kolom Baru)
+  // EKSPOR EXCEL
   const exportToExcel = () => {
     const dataToExport: any[] = transaksiFilter.map((t, index) => ({
       'No': index + 1,
@@ -91,24 +101,27 @@ export default function Laporan() {
       'Nominal (Rp)': t.jumlah
     }));
 
+    const periodeText = `${formatTanggalIndo(tanggalMulai)} s/d ${formatTanggalIndo(tanggalSelesai)}`;
+
     dataToExport.push({});
     dataToExport.push({ 'Keterangan': 'TOTAL PEMASUKAN', 'Nominal (Rp)': summary.pemasukan });
     dataToExport.push({ 'Keterangan': 'TOTAL PENGELUARAN', 'Nominal (Rp)': summary.pengeluaran });
     dataToExport.push({ 'Keterangan': 'SALDO AKHIR', 'Nominal (Rp)': summary.saldo });
     dataToExport.push({});
     dataToExport.push({ 'No': 'Dicetak Oleh:', 'Tanggal': adminEmail });
-    dataToExport.push({ 'No': 'Periode:', 'Tanggal': `${bulan === 0 ? 'Semua Bulan' : namaBulan[bulan]} ${tahun}` });
+    dataToExport.push({ 'No': 'Periode:', 'Tanggal': periodeText });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan');
     
-    XLSX.writeFile(workbook, `Laporan_Kas_${namaBulan[bulan]}_${tahun}.xlsx`);
+    XLSX.writeFile(workbook, `Laporan_Kas_${tanggalMulai}_sampai_${tanggalSelesai}.xlsx`);
   };
 
-  // EKSPOR PDF (Dengan Urutan Kolom Baru)
+  // EKSPOR PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
+    const periodeText = `${formatTanggalIndo(tanggalMulai)} s/d ${formatTanggalIndo(tanggalSelesai)}`;
     
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -116,7 +129,7 @@ export default function Laporan() {
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Periode: ${bulan === 0 ? 'Semua Bulan' : namaBulan[bulan]} ${tahun}`, 14, 26);
+    doc.text(`Periode: ${periodeText}`, 14, 26);
     doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID')}`, 14, 31);
     doc.text(`Dicetak oleh: ${adminEmail}`, 14, 36);
 
@@ -145,7 +158,7 @@ export default function Laporan() {
     doc.text(`Total Pengeluaran: ${formatRupiah(summary.pengeluaran)}`, 14, finalY + 16);
     doc.text(`Saldo Akhir:     ${formatRupiah(summary.saldo)}`, 14, finalY + 22);
 
-    doc.save(`Laporan_Kas_${namaBulan[bulan]}_${tahun}.pdf`);
+    doc.save(`Laporan_Kas_${tanggalMulai}_sampai_${tanggalSelesai}.pdf`);
   };
 
   return (
@@ -156,29 +169,29 @@ export default function Laporan() {
           <ArrowLeft size={18} className="mr-2" /> Kembali ke Dashboard
         </Link>
 
-        {/* Panel Filter */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row items-end gap-4">
+        {/* Panel Filter Rentang Tanggal */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row items-end gap-6">
           <div className="w-full md:w-1/3">
             <label className="block text-sm font-bold text-gray-900 mb-2 flex items-center">
-              <Filter size={16} className="mr-2" /> Filter Bulan
+              <Calendar size={16} className="mr-2" /> Tanggal Mulai
             </label>
-            <select 
+            <input 
+              type="date" 
               className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white text-gray-900 font-bold"
-              value={bulan}
-              onChange={(e) => setBulan(Number(e.target.value))}
-            >
-              {namaBulan.map((nama, i) => (
-                <option key={i} value={i}>{nama}</option>
-              ))}
-            </select>
+              value={tanggalMulai}
+              onChange={(e) => setTanggalMulai(e.target.value)}
+            />
           </div>
           <div className="w-full md:w-1/3">
-            <label className="block text-sm font-bold text-gray-900 mb-2">Tahun</label>
+            <label className="block text-sm font-bold text-gray-900 mb-2 flex items-center">
+              <Calendar size={16} className="mr-2" /> Tanggal Selesai
+            </label>
             <input 
-              type="number" 
+              type="date" 
               className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white text-gray-900 font-bold"
-              value={tahun}
-              onChange={(e) => setTahun(Number(e.target.value))}
+              value={tanggalSelesai}
+              min={tanggalMulai} // Tidak boleh lebih kecil dari tanggal mulai
+              onChange={(e) => setTanggalSelesai(e.target.value)}
             />
           </div>
         </div>
