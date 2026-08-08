@@ -2,197 +2,274 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Wallet, Plus, Trash2, ShoppingCart } from 'lucide-react';
 
 export default function TambahTransaksi() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [kegiatanList, setKegiatanList] = useState<any[]>([]);
   
-  // State untuk Data Master (Satu Kegiatan)
+  // State Data Master
+  const [kegiatanList, setKegiatanList] = useState<any[]>([]);
+  const [kategoriList, setKategoriList] = useState<any[]>([]);
+
+  // State Keranjang
+  const [keranjang, setKeranjang] = useState<any[]>([]);
+
+  // State Form Input
   const [idKegiatan, setIdKegiatan] = useState('');
+  const [idKategori, setIdKategori] = useState('');
+  const [jenisTransaksi, setJenisTransaksi] = useState('Pemasukan');
+  const [jumlah, setJumlah] = useState('');
+  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [detail, setDetail] = useState('');
 
-  // State untuk Data Detail (Banyak Transaksi)
-  const [barisTransaksi, setBarisTransaksi] = useState([
-    { tanggal_transaksi: '', jenis_transaksi: 'Pemasukan', detail_transaksi: '', jumlah: '' }
-  ]);
-
-  // TAMBAHAN BARU: Pengecekan Login Saat Halaman Dimuat
+  // Mengambil Data Master
   useEffect(() => {
-    const cekAkses = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Anda tidak memiliki akses ke halaman ini. Silakan Login!');
-        router.push('/login');
-      }
-    };
-    cekAkses();
-  }, [router]);
+    const fetchData = async () => {
+      const { data: dataKegiatan } = await supabase.from('kegiatan').select('*').order('created_at', { ascending: false });
+      if (dataKegiatan) setKegiatanList(dataKegiatan);
 
-  // Mengambil daftar kegiatan untuk dropdown
-  useEffect(() => {
-    const fetchKegiatan = async () => {
-      const { data } = await supabase.from('kegiatan').select('*').order('nama_kegiatan', { ascending: true });
-      if (data) setKegiatanList(data);
+      const { data: dataKategori } = await supabase.from('kategori').select('*');
+      if (dataKategori) setKategoriList(dataKategori);
     };
-    fetchKegiatan();
+    fetchData();
   }, []);
 
-  // Fungsi Tambah Baris Form
-  const tambahBaris = () => {
-    setBarisTransaksi([
-      ...barisTransaksi, 
-      { tanggal_transaksi: '', jenis_transaksi: 'Pemasukan', detail_transaksi: '', jumlah: '' }
-    ]);
-  };
+  const kategoriTersaring = kategoriList.filter(k => k.jenis === jenisTransaksi);
 
-  // Fungsi Hapus Baris Form
-  const hapusBaris = (index: number) => {
-    const dataBaru = [...barisTransaksi];
-    dataBaru.splice(index, 1);
-    setBarisTransaksi(dataBaru);
-  };
-
-  // Fungsi Update Input pada baris tertentu
-  const handleChangeBaris = (index: number, field: string, value: string) => {
-    const dataBaru: any = [...barisTransaksi];
-    dataBaru[index][field] = value;
-    setBarisTransaksi(dataBaru);
-  };
-
-  // Simpan Semua Data ke Database
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleTambahKeranjang = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!idKegiatan || !idKategori || !jumlah) {
+      alert('Harap lengkapi Kegiatan, Kategori, dan Nominal!');
+      return;
+    }
+
+    const namaKegiatan = kegiatanList.find(k => k.id_kegiatan === idKegiatan)?.nama_kegiatan;
+    const namaKategori = kategoriList.find(k => k.id_kategori === idKategori)?.nama_kategori;
+
+    const itemBaru = {
+      id_temp: Date.now(),
+      idKegiatan,
+      namaKegiatan,
+      idKategori,
+      namaKategori,
+      jenisTransaksi,
+      jumlah: parseFloat(jumlah),
+      tanggal,
+      detail
+    };
+
+    setKeranjang([...keranjang, itemBaru]);
+    setJumlah('');
+    setDetail('');
+  };
+
+  const handleHapusKeranjang = (id_temp: number) => {
+    const keranjangBaru = keranjang.filter(item => item.id_temp !== id_temp);
+    setKeranjang(keranjangBaru);
+  };
+
+  const handleSimpanKeDatabase = async () => {
+    if (keranjang.length === 0) return;
+    const isConfirm = window.confirm(`Yakin ingin menyimpan ${keranjang.length} transaksi ini ke database?`);
+    if (!isConfirm) return;
+
     setIsLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      alert('Sesi admin berakhir. Silakan login ulang.');
-      router.push('/login');
-      return;
-    }
-
-    if (!idKegiatan) {
-      alert('Pilih kategori kegiatan terlebih dahulu!');
-      setIsLoading(false);
-      return;
-    }
-
-    // 1. Memformat data array sesuai struktur database
-    const payload = barisTransaksi.map((baris) => ({
-      id_kegiatan: idKegiatan,
-      diinput_oleh: user.id,
-      tanggal_transaksi: baris.tanggal_transaksi,
-      jenis_transaksi: baris.jenis_transaksi,
-      detail_transaksi: baris.detail_transaksi,
-      jumlah: Number(baris.jumlah)
+    const payloadDatabase = keranjang.map(item => ({
+      id_kegiatan: item.idKegiatan,
+      id_kategori: item.idKategori,
+      jenis_transaksi: item.jenisTransaksi,
+      jumlah: item.jumlah,
+      tanggal_transaksi: item.tanggal,
+      detail_transaksi: item.detail
     }));
 
-    // 2. Insert banyak data sekaligus (Batch Insert)
-    const { error } = await supabase.from('transaksi').insert(payload);
-
+    const { error } = await supabase.from('transaksi').insert(payloadDatabase);
     setIsLoading(false);
 
     if (error) {
-      alert('Gagal menyimpan: ' + error.message);
+      alert('Gagal menyimpan transaksi: ' + error.message);
     } else {
-      alert(`${barisTransaksi.length} Transaksi Berhasil Dicatat!`);
-      router.push('/');
-      router.refresh();
+      alert(`${keranjang.length} Transaksi berhasil dicatat ke sistem!`);
+      setKeranjang([]); 
     }
   };
 
+  const formatRupiah = (angka: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  };
+
+  const totalMasuk = keranjang.filter(i => i.jenisTransaksi === 'Pemasukan').reduce((acc, curr) => acc + curr.jumlah, 0);
+  const totalKeluar = keranjang.filter(i => i.jenisTransaksi === 'Pengeluaran').reduce((acc, curr) => acc + curr.jumlah, 0);
+
   return (
-    <main className="p-6 md:p-10 font-sans bg-gray-50 min-h-screen">
-      <div className="max-w-5xl mx-auto">
-        <Link href="/" className="text-blue-600 hover:underline mb-6 inline-block font-medium">
-          &larr; Kembali ke Dashboard
-        </Link>
+    <main className="p-6 md:p-10 font-sans bg-gray-50 min-h-screen text-gray-900">
+      <div className="max-w-6xl mx-auto">
         
-        <div className="bg-white p-6 md:p-8 rounded-xl shadow border border-gray-200">
-          <h1 className="text-2xl font-bold mb-6 text-gray-800">Catat Transaksi Berantai</h1>
+        <Link href="/" className="inline-flex items-center text-blue-700 hover:text-blue-900 font-bold mb-6 transition-colors">
+          <ArrowLeft size={18} className="mr-2" /> Kembali ke Dashboard
+        </Link>
 
-          <form onSubmit={handleSubmit}>
-            {/* Bagian Master: Pilih Kegiatan */}
-            <div className="mb-8 p-5 bg-blue-50 rounded-lg border border-blue-100">
-              <label className="block text-sm font-semibold text-blue-900 mb-2">Kegiatan Utama (Satu untuk semua transaksi di bawah)</label>
-              <select 
-                required
-                className="w-full md:w-1/2 p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white text-gray-900 font-medium"
-                value={idKegiatan}
-                onChange={(e) => setIdKegiatan(e.target.value)}
-              >
-                <option value="" disabled>-- Pilih Kegiatan --</option>
-                {kegiatanList.map((k) => (
-                  <option key={k.id_kegiatan} value={k.id_kegiatan}>{k.nama_kegiatan}</option>
-                ))}
-              </select>
-            </div>
+        <div className="flex items-center gap-4 mb-8">
+          <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl">
+            <Wallet size={32} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Catat Transaksi (Massal)</h1>
+            <p className="text-gray-500 font-medium mt-1">Kumpulkan data di keranjang, lalu simpan sekaligus.</p>
+          </div>
+        </div>
 
-            {/* Bagian Detail: Daftar Transaksi */}
-            <div className="space-y-4 mb-6">
-              {barisTransaksi.map((baris, index) => (
-                <div key={index} className="flex flex-col md:flex-row gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  
-                  <div className="w-full md:w-1/4">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" required 
-                      className="w-full p-2.5 border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-900 font-medium" 
-                      value={baris.tanggal_transaksi} 
-                      onChange={(e) => handleChangeBaris(index, 'tanggal_transaksi', e.target.value)} />
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* BAGIAN KIRI: Form Input */}
+          <div className="lg:col-span-5 bg-white p-6 rounded-3xl shadow-sm border border-gray-200 h-fit">
+            <h2 className="text-xl font-bold mb-6 border-b pb-4">Form Input Nota</h2>
+            
+            <form onSubmit={handleTambahKeranjang} className="space-y-5">
+              
+              {/* Jenis Transaksi (Radio Buttons) */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Arus Kas</label>
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center p-3 border rounded-xl cursor-pointer transition-all ${
+                    jenisTransaksi === 'Pemasukan' 
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' 
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}>
+                    <input 
+                      type="radio" 
+                      name="jenis" 
+                      value="Pemasukan"
+                      checked={jenisTransaksi === 'Pemasukan'}
+                      onChange={(e) => { setJenisTransaksi(e.target.value); setIdKategori(''); }}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="ml-2 font-bold text-sm">Pemasukan (+)</span>
+                  </label>
 
-                  <div className="w-full md:w-1/4">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Jenis</label>
-                    <select 
-                      className="w-full p-2.5 border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-900 font-medium" 
-                      value={baris.jenis_transaksi} 
-                      onChange={(e) => handleChangeBaris(index, 'jenis_transaksi', e.target.value)}>
-                      {/* Koreksi Istilah Akuntansi */}
-                      <option value="Pemasukan">Pemasukan (Debit)</option>
-                      <option value="Pengeluaran">Pengeluaran (Kredit)</option>
-                    </select>
-                  </div>
-
-                  <div className="w-full md:w-1/3">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Keterangan Detail</label>
-                    <input type="text" required placeholder="Contoh: Konsumsi rapat" 
-                      className="w-full p-2.5 border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-900 font-medium placeholder:text-gray-400" 
-                      value={baris.detail_transaksi} 
-                      onChange={(e) => handleChangeBaris(index, 'detail_transaksi', e.target.value)} />
-                  </div>
-
-                  <div className="w-full md:w-1/4">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Nominal (Rp)</label>
-                    <input type="number" required placeholder="50000" min="0" 
-                      className="w-full p-2.5 border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-900 font-medium placeholder:text-gray-400" 
-                      value={baris.jumlah} 
-                      onChange={(e) => handleChangeBaris(index, 'jumlah', e.target.value)} />
-                  </div>
-
-                  {barisTransaksi.length > 1 && (
-                    <button type="button" onClick={() => hapusBaris(index)} className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 h-11 px-3 flex items-center justify-center">
-                      <Trash2 size={20} />
-                    </button>
-                  )}
+                  <label className={`flex-1 flex items-center p-3 border rounded-xl cursor-pointer transition-all ${
+                    jenisTransaksi === 'Pengeluaran' 
+                      ? 'border-rose-500 bg-rose-50 text-rose-700 ring-1 ring-rose-500' 
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}>
+                    <input 
+                      type="radio" 
+                      name="jenis" 
+                      value="Pengeluaran"
+                      checked={jenisTransaksi === 'Pengeluaran'}
+                      onChange={(e) => { setJenisTransaksi(e.target.value); setIdKategori(''); }}
+                      className="w-4 h-4 text-rose-600 border-gray-300 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <span className="ml-2 font-bold text-sm">Pengeluaran (-)</span>
+                  </label>
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal</label>
+                <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 outline-none font-medium text-sm" required />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Kegiatan</label>
+                <select value={idKegiatan} onChange={(e) => setIdKegiatan(e.target.value)} className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 outline-none font-medium text-sm" required>
+                  <option value="" disabled>-- Pilih Kegiatan --</option>
+                  {kegiatanList.map((k) => <option key={k.id_kegiatan} value={k.id_kegiatan}>{k.nama_kegiatan}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Kategori</label>
+                <select value={idKategori} onChange={(e) => setIdKategori(e.target.value)} className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 outline-none font-medium text-sm" required>
+                  <option value="" disabled>-- Pilih Kategori --</option>
+                  {kategoriTersaring.map((k) => <option key={k.id_kategori} value={k.id_kategori}>{k.nama_kategori}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Nominal (Rp)</label>
+                <input type="number" value={jumlah} onChange={(e) => setJumlah(e.target.value)} min="0" placeholder="0" className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 outline-none font-black text-lg" required />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Keterangan Tambahan</label>
+                <textarea rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="Contoh: Beli Aqua" className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 outline-none text-sm resize-none"></textarea>
+              </div>
+
+              <button type="submit" className="w-full flex items-center justify-center p-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors">
+                <Plus size={18} className="mr-2" /> Tambah ke Keranjang
+              </button>
+            </form>
+          </div>
+
+          {/* BAGIAN KANAN: Keranjang & Preview */}
+          <div className="lg:col-span-7 flex flex-col gap-6">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex-1">
+              <div className="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 className="text-xl font-bold flex items-center">
+                  <ShoppingCart size={22} className="mr-2 text-blue-600" />
+                  Daftar Antrean (<span className="text-blue-600 ml-1">{keranjang.length}</span>)
+                </h2>
+                
+                {keranjang.length > 0 && (
+                  <button onClick={handleSimpanKeDatabase} disabled={isLoading} className="flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm transition-colors disabled:opacity-50">
+                    <Save size={18} className="mr-2" />
+                    {isLoading ? 'Menyimpan...' : 'Simpan ke Database'}
+                  </button>
+                )}
+              </div>
+
+              {keranjang.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                  <ShoppingCart size={48} className="mb-4 opacity-20" />
+                  <p className="font-medium">Belum ada transaksi di keranjang.</p>
+                </div>
+              ) : (
+                <div className="overflow-y-auto max-h-[400px] pr-2">
+                  <div className="space-y-3">
+                    {keranjang.map((item, index) => (
+                      <div key={item.id_temp} className="flex justify-between items-center p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-white transition-colors group">
+                        <div className="flex gap-4">
+                          <div className={`flex flex-col justify-center items-center w-10 h-10 rounded-full font-black text-sm ${item.jenisTransaksi === 'Pemasukan' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-800 text-sm mb-0.5">{item.namaKategori} <span className="text-gray-400 font-normal">| {item.namaKegiatan}</span></p>
+                            <p className="text-xs text-gray-500 font-medium">{item.tanggal} • {item.detail || 'Tanpa keterangan'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <p className={`font-black tracking-tight ${item.jenisTransaksi === 'Pemasukan' ? 'text-emerald-600' : 'text-gray-900'}`}>
+                            {item.jenisTransaksi === 'Pemasukan' ? '+' : '-'}{formatRupiah(item.jumlah)}
+                          </p>
+                          <button onClick={() => handleHapusKeranjang(item.id_temp)} className="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Tombol Aksi Bawah */}
-            <div className="flex flex-col md:flex-row justify-between items-center mt-8 gap-4 pt-4 border-t border-gray-200">
-              <button type="button" onClick={tambahBaris} className="flex items-center text-blue-700 hover:bg-blue-100 font-bold px-4 py-2 bg-blue-50 rounded-lg transition-colors">
-                <Plus size={18} className="mr-2" /> Tambah Baris Transaksi
-              </button>
+            {/* Kotak Ringkasan Nominal */}
+            {keranjang.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
+                  <p className="text-emerald-600 text-sm font-bold mb-1">Total Pemasukan Antrean</p>
+                  <p className="text-2xl font-black text-emerald-700">{formatRupiah(totalMasuk)}</p>
+                </div>
+                <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl">
+                  <p className="text-rose-600 text-sm font-bold mb-1">Total Pengeluaran Antrean</p>
+                  <p className="text-2xl font-black text-rose-700">{formatRupiah(totalKeluar)}</p>
+                </div>
+              </div>
+            )}
 
-              <button type="submit" disabled={isLoading} className="w-full md:w-auto px-8 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-lg disabled:bg-gray-400 shadow-md">
-                {isLoading ? 'Menyimpan...' : `Simpan ${barisTransaksi.length} Transaksi`}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </main>

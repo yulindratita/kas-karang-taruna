@@ -4,33 +4,35 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, PlusCircle, Trash2, List, CalendarDays } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Tag, Layers } from 'lucide-react';
 
-export default function KelolaKegiatan() {
+export default function KelolaKategori() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [kegiatanList, setKegiatanList] = useState<any[]>([]);
+  const [kategoriList, setKategoriList] = useState<any[]>([]);
   
-  // State Form
-  const [namaKegiatan, setNamaKegiatan] = useState('');
-  const [deskripsi, setDeskripsi] = useState('');
+  // State untuk Form Tambah Kategori
+  const [namaKategori, setNamaKategori] = useState('');
+  const [jenis, setJenis] = useState('Pemasukan');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchKegiatan = async () => {
+  // Ambil Data Kategori
+  const fetchKategori = async () => {
     const { data, error } = await supabase
-      .from('kegiatan')
+      .from('kategori')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching kegiatan:', error);
+      console.error('Error fetching kategori:', error);
     } else {
-      setKegiatanList(data || []);
+      setKategoriList(data || []);
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
+    // Proteksi Halaman: Pastikan yang masuk adalah admin
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -38,52 +40,50 @@ export default function KelolaKegiatan() {
         router.push('/login');
         return;
       }
-      fetchKegiatan();
+      fetchKategori();
     };
     checkUser();
   }, [router]);
 
+  // Fungsi Tambah Kategori
   const handleTambah = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!namaKegiatan) return alert('Nama kegiatan tidak boleh kosong!');
+    if (!namaKategori) return alert('Nama kategori tidak boleh kosong!');
     
     setIsSubmitting(true);
     const { error } = await supabase
-      .from('kegiatan')
-      .insert([{ 
-        nama_kegiatan: namaKegiatan, 
-        deskripsi: deskripsi 
-      }]);
+      .from('kategori')
+      .insert([{ nama_kategori: namaKategori, jenis: jenis }]);
 
     if (error) {
-      alert('Gagal menambahkan kegiatan: ' + error.message);
+      alert('Gagal menambahkan kategori: ' + error.message);
     } else {
-      setNamaKegiatan('');
-      setDeskripsi('');
-      fetchKegiatan(); // Refresh tabel
+      setNamaKategori('');
+      fetchKategori(); // Refresh tabel
     }
     setIsSubmitting(false);
   };
 
+  // Fungsi Hapus Kategori
   const handleHapus = async (id: string, nama: string) => {
-    const isConfirm = window.confirm(`Yakin ingin menghapus kegiatan "${nama}"?`);
+    const isConfirm = window.confirm(`Yakin ingin menghapus kategori "${nama}"?`);
     if (!isConfirm) return;
 
     const { error } = await supabase
-      .from('kegiatan')
+      .from('kategori')
       .delete()
-      .eq('id_kegiatan', id);
+      .eq('id_kategori', id);
 
     if (error) {
-      alert('Gagal menghapus kegiatan (Mungkin sedang digunakan di transaksi): ' + error.message);
+      alert('Gagal menghapus kategori (Mungkin sedang digunakan di transaksi): ' + error.message);
     } else {
-      fetchKegiatan();
+      fetchKategori();
     }
   };
 
   return (
     <main className="p-6 md:p-10 font-sans bg-gray-50 min-h-screen text-gray-900">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         
         <Link href="/" className="inline-flex items-center text-blue-700 hover:text-blue-900 font-bold mb-6 transition-colors">
           <ArrowLeft size={18} className="mr-2" /> Kembali ke Dashboard
@@ -91,11 +91,11 @@ export default function KelolaKegiatan() {
 
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
-            <CalendarDays size={28} />
+            <Layers size={28} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Kelola Kegiatan</h1>
-            <p className="text-gray-500 font-medium mt-1">Daftarkan program atau acara sebagai wadah transaksi kas.</p>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Kelola Kategori</h1>
+            <p className="text-gray-500 font-medium mt-1">Buat kategori spesifik untuk merapikan pembukuan kas.</p>
           </div>
         </div>
 
@@ -105,72 +105,77 @@ export default function KelolaKegiatan() {
           <div className="md:col-span-1">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <PlusCircle size={18} className="mr-2 text-blue-600" /> Buat Kegiatan
+                <PlusCircle size={18} className="mr-2 text-blue-600" /> Tambah Baru
               </h2>
               <form onSubmit={handleTambah} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nama Kegiatan</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Nama Kategori</label>
                   <input 
                     type="text" 
-                    placeholder="Contoh: HUT RI ke-81"
-                    value={namaKegiatan}
-                    onChange={(e) => setNamaKegiatan(e.target.value)}
+                    placeholder="Contoh: Konsumsi"
+                    value={namaKategori}
+                    onChange={(e) => setNamaKategori(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all bg-gray-50 focus:bg-white"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Deskripsi Singkat</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Opsional: Penjelasan singkat acara..."
-                    value={deskripsi}
-                    onChange={(e) => setDeskripsi(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all bg-gray-50 focus:bg-white resize-none"
-                  ></textarea>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Jenis Arus Kas</label>
+                  <select 
+                    value={jenis}
+                    onChange={(e) => setJenis(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all bg-gray-50 focus:bg-white font-semibold"
+                  >
+                    <option value="Pemasukan">Pemasukan (+)</option>
+                    <option value="Pengeluaran">Pengeluaran (-)</option>
+                  </select>
                 </div>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Menyimpan...' : 'Simpan Kegiatan'}
+                  {isSubmitting ? 'Menyimpan...' : 'Simpan Kategori'}
                 </button>
               </form>
             </div>
           </div>
 
-          {/* Tabel Daftar Kegiatan */}
+          {/* Tabel Daftar Kategori */}
           <div className="md:col-span-2">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <List size={18} className="mr-2 text-blue-600" /> Daftar Kegiatan Berjalan
+                <Tag size={18} className="mr-2 text-blue-600" /> Daftar Kategori Tersedia
               </h2>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b-2 border-gray-100 bg-gray-50">
-                      <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider rounded-tl-xl">Nama Kegiatan</th>
-                      <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Deskripsi</th>
+                      <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider rounded-tl-xl">Kategori</th>
+                      <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Jenis</th>
                       <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right rounded-tr-xl">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {isLoading ? (
                       <tr><td colSpan={3} className="py-8 text-center text-gray-500 font-medium">Memuat data...</td></tr>
-                    ) : kegiatanList.length === 0 ? (
-                      <tr><td colSpan={3} className="py-8 text-center text-gray-500 font-medium">Belum ada kegiatan didaftarkan.</td></tr>
+                    ) : kategoriList.length === 0 ? (
+                      <tr><td colSpan={3} className="py-8 text-center text-gray-500 font-medium">Belum ada kategori. Silakan buat di samping.</td></tr>
                     ) : (
-                      kegiatanList.map((item) => (
-                        <tr key={item.id_kegiatan} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-4 px-4 font-bold text-gray-800">{item.nama_kegiatan}</td>
-                          <td className="py-4 px-4 text-sm text-gray-600 max-w-xs truncate">{item.deskripsi || '-'}</td>
-                          <td className="py-4 px-4 text-right">
+                      kategoriList.map((item) => (
+                        <tr key={item.id_kategori} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-3 px-4 font-bold text-gray-800">{item.nama_kategori}</td>
+                          <td className="py-3 px-4">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${item.jenis === 'Pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                              {item.jenis}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
                             <button 
-                              onClick={() => handleHapus(item.id_kegiatan, item.nama_kegiatan)}
+                              onClick={() => handleHapus(item.id_kategori, item.nama_kategori)}
                               className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Hapus Kegiatan"
+                              title="Hapus Kategori"
                             >
                               <Trash2 size={18} />
                             </button>
