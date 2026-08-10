@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, PlusCircle, List, LogIn, LogOut, UserCircle, ArrowDownRight, ArrowUpRight, CalendarDays, FileBarChart, Trash2, Layers, TrendingUp, ShieldCheck } from 'lucide-react';
+// Tambahan Ikon Sun dan Moon untuk Dark Mode
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, PlusCircle, List, LogIn, LogOut, UserCircle, ArrowDownRight, ArrowUpRight, CalendarDays, FileBarChart, Trash2, Layers, TrendingUp, ShieldCheck, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -21,19 +22,56 @@ export default function Dashboard() {
   const [riwayatTransaksi, setRiwayatTransaksi] = useState<any[]>([]);
   const [dataGrafik, setDataGrafik] = useState<any[]>([]);
 
-  // State untuk efek Sticky & Shrink Banner
-  const [isScrolled, setIsScrolled] = useState(false);
+  // --- STATE UNTUK DARK MODE & EFEK STICKY ---
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Pantau Scroll Layar
+  // Inisialisasi Dark Mode dari LocalStorage saat web dimuat
   useEffect(() => {
-    const handleScroll = () => {
-      // Jika di-scroll lebih dari 20 pixel, aktifkan mode 'mengecil'
-      setIsScrolled(window.scrollY > 20);
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
   }, []);
+
+  // Fungsi Toggle Dark Mode
+  const toggleTheme = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDarkMode(true);
+    }
+  };
+
+  // --- FITUR AUTO LOGOUT (IDLE TIMER 10 MENIT) ---
+  useEffect(() => {
+    if (!user) return;
+    let timeoutId: NodeJS.Timeout;
+
+    const logoutWaktuHabis = async () => {
+      await supabase.auth.signOut();
+      alert('Sesi Anda telah berakhir karena tidak ada aktivitas selama 10 menit. Silakan login kembali.');
+      window.location.href = '/'; 
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(logoutWaktuHabis, 10 * 60 * 1000); 
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [user]);
 
   const loadTransaksi = useCallback(async () => {
     const { data: transaksi } = await supabase
@@ -43,7 +81,6 @@ export default function Dashboard() {
     
     if (transaksi) {
       setRiwayatTransaksi(transaksi.slice(0, 10));
-      
       let totalMasuk = 0;
       let totalKeluar = 0;
       const grafikBulanan: Record<string, { name: string; Pemasukan: number; Pengeluaran: number }> = {};
@@ -73,7 +110,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadTransaksi();
-
     const fetchSessionAndProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -88,15 +124,11 @@ export default function Dashboard() {
     };
 
     fetchSessionAndProfile();
-
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
       if (!session) setUserProfil(null);
     });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => authListener.subscription.unsubscribe();
   }, [loadTransaksi]);
 
   const handleAksesAdmin = (path: string) => {
@@ -122,7 +154,6 @@ export default function Dashboard() {
     if (!isConfirm) return;
 
     const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-
     if (error) {
       alert('Gagal menghapus transaksi: ' + error.message);
     } else {
@@ -130,230 +161,222 @@ export default function Dashboard() {
     }
   };
 
-  const formatRupiah = (angka: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-  };
+  const formatRupiah = (angka: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100">
-          <p className="font-bold text-gray-800 mb-2">{label}</p>
-          <p className="text-emerald-600 font-semibold text-sm">Pemasukan: {formatRupiah(payload[0].value)}</p>
-          <p className="text-rose-600 font-semibold text-sm">Pengeluaran: {formatRupiah(payload[1].value)}</p>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <p className="font-bold text-gray-800 dark:text-gray-200 mb-2">{label}</p>
+          <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">Pemasukan: {formatRupiah(payload[0].value)}</p>
+          <p className="text-rose-600 dark:text-rose-400 font-semibold text-sm">Pengeluaran: {formatRupiah(payload[1].value)}</p>
         </div>
       );
     }
     return null;
   };
 
-  // --- LOGIKA HAK AKSES (RBAC) ---
   const role = userProfil?.role?.toUpperCase() || '';
   const isBisaEdit = role === 'SUPER_ADMIN' || role === 'BENDAHARA';
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900 selection:bg-blue-100 relative">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <main className={`min-h-screen p-4 md:p-8 font-sans transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-gray-100 selection:bg-purple-900' : 'bg-gray-50 text-gray-900 selection:bg-blue-100'} relative`}>
+      <div className="max-w-6xl mx-auto space-y-5 md:space-y-6">
         
-        {/* === CONTAINER 1: HERO / BANNER (STICKY & SHRINK) === */}
-        {/* Menambahkan z-40 agar selalu di atas elemen lain, dan backdrop-blur agar keren transparan */}
-        <div 
-          className={`sticky top-2 md:top-4 z-40 transition-all duration-300 ease-in-out flex items-center bg-white/90 backdrop-blur-md border border-gray-200 shadow-sm
-            ${isScrolled ? 'p-3 sm:p-4 gap-3 rounded-2xl' : 'p-6 md:p-8 gap-5 rounded-3xl'}
-          `}
-        >
-          <div 
-            className={`relative flex-shrink-0 rounded-full overflow-hidden border border-gray-100 bg-gray-50 transition-all duration-300 ease-in-out
-              ${isScrolled ? 'w-10 h-10' : 'w-16 h-16 sm:w-20 sm:h-20'}
-            `}
-          >
+        {/* === CONTAINER 1: HERO / BANNER === */}
+        <div className={`flex items-center gap-4 md:gap-5 p-5 md:p-6 rounded-2xl border shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <div className="relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-full overflow-hidden border border-gray-100 bg-gray-50">
             <Image src="/logo.png" alt="Logo" fill className="object-cover" />
           </div>
           <div>
-            <h1 
-              className={`font-black text-gray-900 tracking-tight transition-all duration-300 ease-in-out
-                ${isScrolled ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'}
-              `}
-            >
-              Dashboard Keuangan
-            </h1>
-            <p 
-              className={`text-gray-500 font-medium transition-all duration-300 ease-in-out overflow-hidden
-                ${isScrolled ? 'h-0 opacity-0 text-[0px]' : 'h-5 opacity-100 text-sm mt-1'}
-              `}
-            >
-              Transparansi arus kas organisasi.
-            </p>
+            <h1 className="text-xl md:text-3xl font-black tracking-tight">Dashboard Keuangan</h1>
+            <p className={`text-xs md:text-sm font-medium mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Transparansi arus kas organisasi.</p>
           </div>
         </div>
 
-        {/* === CONTAINER 2: STATUS PROFIL & TOMBOL KONTROL === */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm relative z-10">
+        {/* === PANEL KONTROL (2 KONTAINER SIMETRIS) === */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 relative z-10">
           
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${user ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
-              <UserCircle size={24} strokeWidth={2} />
+          {/* BAGIAN KIRI (Profil & Pengaturan) */}
+          <div className={`lg:col-span-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 rounded-2xl border shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${user ? (isDarkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500')}`}>
+                <UserCircle size={24} strokeWidth={2} />
+              </div>
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-widest mb-0.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Status Akses</p>
+                {isLoading ? (
+                  <p className="font-semibold text-sm text-gray-500">Memeriksa sesi...</p>
+                ) : user ? (
+                  <div className="flex flex-col">
+                    <span className="font-bold text-sm truncate max-w-[150px]">{userProfil?.nama_lengkap || user.email}</span>
+                    <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] w-max font-bold ${
+                      role === 'SUPER_ADMIN' ? (isDarkMode ? 'bg-purple-900/40 text-purple-400' : 'bg-purple-100 text-purple-700') : 
+                      role === 'BENDAHARA' ? (isDarkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-700') : 
+                      (isDarkMode ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700')
+                    }`}>
+                      {role || 'PENGAWAS'}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="font-bold text-gray-500 text-sm">Mode Publik</p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">Status Akses</p>
-              {isLoading ? (
-                <p className="font-semibold text-sm text-gray-500">Memeriksa sesi...</p>
-              ) : user ? (
-                <p className="font-bold text-gray-900 text-sm flex items-center">
-                  <span className="truncate max-w-[120px] sm:max-w-xs">{userProfil?.nama_lengkap || user.email}</span>
-                  <span className={`font-bold ml-2 px-2 py-0.5 rounded-md text-[10px] whitespace-nowrap ${role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' : role === 'BENDAHARA' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {role || 'PENGAWAS'}
-                  </span>
-                </p>
+
+            {/* Grup Tombol Profil */}
+            <div className="flex w-full sm:w-auto items-center gap-2">
+              <button onClick={toggleTheme} className={`flex-1 sm:flex-none p-2.5 flex justify-center items-center rounded-xl font-bold transition-colors border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-400 hover:bg-gray-600' : 'bg-gray-50 border-gray-200 text-slate-700 hover:bg-gray-100'}`} title="Ubah Tema">
+                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+
+              {role === 'SUPER_ADMIN' && (
+                <button onClick={() => handleAksesAdmin('/pengguna')} className={`flex-1 sm:flex-none flex justify-center items-center px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-purple-900/30 border-purple-800/50 text-purple-400 hover:bg-purple-900/50' : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'}`}>
+                  <ShieldCheck size={16} className="mr-2" /> Hak Akses
+                </button>
+              )}
+
+              {user ? (
+                <button onClick={handleLogout} className={`flex-1 sm:flex-none flex justify-center items-center px-4 py-2.5 rounded-xl font-bold transition-colors text-sm border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-rose-400 hover:bg-gray-600 hover:border-rose-500/50' : 'bg-white border-gray-200 text-rose-600 hover:bg-rose-50 hover:border-rose-200'}`}>
+                  <LogOut size={16} className="sm:mr-0 md:mr-2" /> <span className="hidden md:inline">Keluar</span>
+                </button>
               ) : (
-                <p className="font-bold text-gray-600 text-sm">Mode Publik (Hanya Lihat)</p>
+                <Link href="/login" className="flex-1 sm:flex-none flex justify-center items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors text-sm shadow-sm">
+                  <LogIn size={16} className="mr-2" /> Login
+                </Link>
               )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          {/* BAGIAN KANAN (Operasional Kas - TATA LETAK GRID RAPI) */}
+          <div className={`lg:col-span-7 grid ${isBisaEdit ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2'} gap-3 p-5 rounded-2xl border shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             {isBisaEdit && (
               <>
-                <button onClick={() => handleAksesAdmin('/kegiatan')} className="flex items-center px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg font-bold text-sm transition-colors">
-                  <List size={16} className="mr-2 text-gray-400" /> Kegiatan
+                <button onClick={() => handleAksesAdmin('/kegiatan')} className={`flex flex-col items-center justify-center p-3 sm:py-4 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}>
+                  <List size={20} className={`mb-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} /> Kegiatan
                 </button>
-                <button onClick={() => handleAksesAdmin('/kategori')} className="flex items-center px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg font-bold text-sm transition-colors">
-                  <Layers size={16} className="mr-2 text-gray-400" /> Kategori
+                <button onClick={() => handleAksesAdmin('/kategori')} className={`flex flex-col items-center justify-center p-3 sm:py-4 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}>
+                  <Layers size={20} className={`mb-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} /> Kategori
                 </button>
               </>
             )}
 
-            <button onClick={() => handleAksesAdmin('/laporan')} className="flex items-center px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg font-bold text-sm transition-colors">
-              <FileBarChart size={16} className="mr-2 text-gray-400" /> Laporan
+            <button onClick={() => handleAksesAdmin('/laporan')} className={`flex flex-col items-center justify-center p-3 sm:py-4 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}>
+              <FileBarChart size={20} className={`mb-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} /> Laporan
             </button>
-            
-            {role === 'SUPER_ADMIN' && (
-              <button onClick={() => handleAksesAdmin('/pengguna')} className="flex items-center px-4 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 rounded-lg font-bold text-sm transition-colors">
-                <ShieldCheck size={16} className="mr-2" /> Hak Akses
-              </button>
-            )}
 
             {isBisaEdit && (
-              <button onClick={() => handleAksesAdmin('/tambah')} className="flex items-center px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-colors shadow-sm">
-                <PlusCircle size={18} className="mr-2" /> Catat
+              <button onClick={() => handleAksesAdmin('/tambah')} className="flex flex-col items-center justify-center p-3 sm:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm border border-transparent">
+                <PlusCircle size={20} className="mb-1.5 opacity-90" /> Catat Kas
               </button>
-            )}
-
-            <div className="hidden sm:block w-px h-8 bg-gray-200 mx-1"></div>
-
-            {user ? (
-              <button onClick={handleLogout} className="flex items-center px-4 py-2 hover:bg-rose-50 text-rose-600 rounded-lg font-bold transition-colors text-sm border border-transparent hover:border-rose-100">
-                <LogOut size={16} className="mr-2" /> Keluar
-              </button>
-            ) : (
-              <Link href="/login" className="flex items-center px-5 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-bold transition-colors text-sm shadow-sm">
-                <LogIn size={16} className="mr-2" /> Login
-              </Link>
             )}
           </div>
+
         </div>
 
         {/* === KARTU RINGKASAN SALDO === */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col justify-between shadow-sm">
-            <div className="flex justify-between items-start mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Total Saldo Kas</p>
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Wallet size={20} /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:gap-6 relative z-10">
+          <div className={`p-6 rounded-2xl border flex flex-col justify-between shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="flex justify-between items-start mb-5">
+              <p className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Saldo Kas</p>
+              <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-50 text-blue-600'}`}><Wallet size={20} /></div>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">{formatRupiah(saldo)}</h3>
+            <h3 className="text-3xl font-black tracking-tight truncate">{formatRupiah(saldo)}</h3>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col justify-between shadow-sm">
-            <div className="flex justify-between items-start mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Pemasukan</p>
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><ArrowDownToLine size={20} /></div>
+          <div className={`p-6 rounded-2xl border flex flex-col justify-between shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="flex justify-between items-start mb-5">
+              <p className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pemasukan</p>
+              <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}><ArrowDownToLine size={20} /></div>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-emerald-600 tracking-tight">{formatRupiah(pemasukan)}</h3>
+            <h3 className={`text-3xl font-black tracking-tight truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{formatRupiah(pemasukan)}</h3>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col justify-between shadow-sm">
-            <div className="flex justify-between items-start mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Pengeluaran</p>
-              <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><ArrowUpFromLine size={20} /></div>
+          <div className={`p-6 rounded-2xl border flex flex-col justify-between shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="flex justify-between items-start mb-5">
+              <p className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pengeluaran</p>
+              <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}><ArrowUpFromLine size={20} /></div>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-rose-600 tracking-tight">{formatRupiah(pengeluaran)}</h3>
+            <h3 className={`text-3xl font-black tracking-tight truncate ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>{formatRupiah(pengeluaran)}</h3>
           </div>
         </div>
 
         {/* === GRID TENGAH: GRAFIK & TABEL === */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 relative z-10">
           
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-gray-200 flex flex-col shadow-sm">
+          {/* CHART AREA */}
+          <div className={`p-6 md:p-8 rounded-2xl border flex flex-col shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+              <div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                 <TrendingUp size={22} />
               </div>
               <div>
-                <h2 className="text-lg font-black text-gray-900 tracking-tight">Statistik Arus Kas</h2>
-                <p className="text-xs font-semibold text-gray-400 mt-0.5">Tren 6 Bulan Terakhir</p>
+                <h2 className="text-lg font-black tracking-tight">Statistik Arus Kas</h2>
+                <p className={`text-xs font-semibold mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Tren 6 Bulan Terakhir</p>
               </div>
             </div>
             
-            <div className="w-full flex-1 min-h-[300px]">
+            <div className="w-full flex-1 min-h-[250px] md:min-h-[300px]">
               {dataGrafik.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dataGrafik} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(val) => `Rp${(val / 1000).toLocaleString('id-ID')}k`} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                    <Bar dataKey="Pemasukan" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                    <Bar dataKey="Pengeluaran" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#374151' : '#f1f5f9'} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: isDarkMode ? '#9ca3af' : '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(val) => `Rp${(val / 1000).toLocaleString('id-ID')}k`} tick={{ fontSize: 12, fill: isDarkMode ? '#9ca3af' : '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: isDarkMode ? '#1f2937' : '#f8fafc' }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px', color: isDarkMode ? '#d1d5db' : '#4b5563' }} />
+                    <Bar dataKey="Pemasukan" fill={isDarkMode ? '#34d399' : '#10b981'} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="Pengeluaran" fill={isDarkMode ? '#fb7185' : '#f43f5e'} radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium text-sm">
-                  Belum ada data untuk ditampilkan grafik.
+                <div className={`w-full h-full flex items-center justify-center font-medium text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Belum ada data grafik.
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col h-full shadow-sm">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-              <h2 className="text-lg font-black text-gray-900 tracking-tight">Riwayat Terbaru</h2>
-              <button onClick={() => handleAksesAdmin('/laporan')} className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
+          {/* TABLE AREA */}
+          <div className={`rounded-2xl border overflow-hidden flex flex-col h-full shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className={`p-6 border-b flex justify-between items-center transition-colors duration-300 ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-white'}`}>
+              <h2 className="text-lg font-black tracking-tight">Riwayat Terbaru</h2>
+              <button onClick={() => handleAksesAdmin('/laporan')} className={`text-sm font-bold transition-colors ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}>
                 Lihat Semua
               </button>
             </div>
             
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-left h-full">
-                <tbody className="divide-y divide-gray-100">
+                <tbody className={`divide-y transition-colors duration-300 ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
                   {isLoading ? (
-                    <tr><td className="py-12 text-center text-gray-400 font-medium text-sm">Memuat data...</td></tr>
+                    <tr><td className={`py-12 text-center font-medium text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Memuat data...</td></tr>
                   ) : riwayatTransaksi.length === 0 ? (
-                    <tr><td className="py-12 text-center text-gray-400 font-medium text-sm">Belum ada transaksi.</td></tr>
+                    <tr><td className={`py-12 text-center font-medium text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Belum ada transaksi.</td></tr>
                   ) : (
                     riwayatTransaksi.slice(0, 5).map((item) => {
                       const isPemasukan = item.jenis_transaksi.toLowerCase() === 'pemasukan';
                       return (
-                        <tr key={item.id_transaksi} className="hover:bg-gray-50/80 transition-colors group">
+                        <tr key={item.id_transaksi} className={`transition-colors group ${isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50/80'}`}>
                           <td className="p-4 sm:px-6">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg flex-shrink-0 ${isPemasukan ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                  {isPemasukan ? <ArrowDownRight size={18} strokeWidth={3} /> : <ArrowUpRight size={18} strokeWidth={3} />}
+                              <div className="flex items-center gap-3 truncate pr-4">
+                                <div className={`p-2.5 rounded-xl flex-shrink-0 ${isPemasukan ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-50 text-emerald-600') : (isDarkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600')}`}>
+                                  {isPemasukan ? <ArrowDownRight size={18} strokeWidth={2.5} /> : <ArrowUpRight size={18} strokeWidth={2.5} />}
                                 </div>
-                                <div>
-                                  <p className="font-bold text-gray-900 text-sm">{item.kategori?.nama_kategori || 'Transaksi'}</p>
-                                  <div className="flex items-center text-xs font-medium text-gray-400 mt-0.5">
-                                    {item.tanggal_transaksi}
+                                <div className="truncate">
+                                  <p className="font-bold text-sm truncate">{item.kategori?.nama_kategori || 'Transaksi'}</p>
+                                  <div className={`flex items-center text-xs font-medium mt-0.5 truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {item.tanggal_transaksi} <span className="mx-1.5 text-[8px]">•</span> {item.kegiatan?.nama_kegiatan}
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right flex items-center gap-3">
-                                <p className={`font-black text-sm tracking-tight ${isPemasukan ? 'text-emerald-600' : 'text-gray-900'}`}>
+                              <div className="text-right flex items-center gap-2 flex-shrink-0">
+                                <p className={`font-black text-sm md:text-base tracking-tight ${isPemasukan ? (isDarkMode ? 'text-emerald-400' : 'text-emerald-600') : (isDarkMode ? 'text-gray-100' : 'text-gray-900')}`}>
                                   {isPemasukan ? '+' : '-'}{formatRupiah(item.jumlah)}
                                 </p>
                                 {isBisaEdit && (
-                                  <button onClick={() => handleHapusTransaksi(item.id_transaksi)} className="p-1.5 text-gray-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                  <button onClick={() => handleHapusTransaksi(item.id_transaksi)} className={`p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100 ${isDarkMode ? 'text-gray-500 hover:text-rose-400 hover:bg-rose-900/30' : 'text-gray-300 hover:text-rose-600 hover:bg-rose-50'}`}>
                                     <Trash2 size={16} />
                                   </button>
                                 )}
