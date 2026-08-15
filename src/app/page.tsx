@@ -10,6 +10,7 @@ import { Transaksi, StatistikKas } from '@/types';
 export default function Dashboard() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('');
 
   // State untuk Statistik Kartu
   const [totalSaldo, setTotalSaldo] = useState(0);
@@ -25,6 +26,20 @@ export default function Dashboard() {
     isDanger: false,
     onConfirm: () => {}
   });
+
+  const fetchUserRole = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: profil } = await supabase
+        .from('users_profile')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      if (profil?.role) setUserRole(profil.role.toUpperCase());
+    } else {
+      setUserRole('');
+    }
+  };
 
   const fetchDataDashboard = async () => {
     setIsLoading(true);
@@ -69,9 +84,27 @@ export default function Dashboard() {
 
   useEffect(() => { 
     fetchDataDashboard(); 
+    fetchUserRole();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchUserRole();
+      } else {
+        setUserRole('');
+      }
+    });
+
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
+  const isBisaEdit = userRole === 'SUPER_ADMIN' || userRole === 'BENDAHARA';
+
   const handleHapus = (id: string) => {
+    if (!isBisaEdit) {
+      alert('Anda tidak memiliki hak akses untuk menghapus transaksi.');
+      return;
+    }
+
     setConfirmDialog({
       isOpen: true,
       title: 'Hapus Transaksi',
@@ -166,14 +199,14 @@ export default function Dashboard() {
                   <th className="py-4 px-6 font-semibold">Deskripsi</th>
                   <th className="py-4 px-6 font-semibold">Kategori</th>
                   <th className="py-4 px-6 font-semibold text-right">Jumlah</th>
-                  <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>
+                  {isBisaEdit && <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-800/80">
                 {isLoading ? (
-                  <tr><td colSpan={5} className="py-12 text-center text-sm opacity-50">Memuat riwayat...</td></tr>
+                  <tr><td colSpan={isBisaEdit ? 5 : 4} className="py-12 text-center text-sm opacity-50">Memuat riwayat...</td></tr>
                 ) : transaksi.length === 0 ? (
-                  <tr><td colSpan={5} className="py-12 text-center text-sm opacity-50">Belum ada transaksi tercatat.</td></tr>
+                  <tr><td colSpan={isBisaEdit ? 5 : 4} className="py-12 text-center text-sm opacity-50">Belum ada transaksi tercatat.</td></tr>
                 ) : (
                   transaksi.map((item) => {
                     const isPemasukan = item.jenis_transaksi === 'Pemasukan';
@@ -191,11 +224,13 @@ export default function Dashboard() {
                         <td className={`py-4 px-6 text-right font-black text-sm ${isPemasukan ? 'text-emerald-600 dark:text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
                           {isPemasukan ? '+' : '-'}{formatRupiah(item.jumlah)}
                         </td>
-                        <td className="py-4 px-6 text-center">
-                          <button onClick={() => handleHapus(item.id_transaksi)} className="p-2 rounded-lg transition-colors text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+                        {isBisaEdit && (
+                          <td className="py-4 px-6 text-center">
+                            <button onClick={() => handleHapus(item.id_transaksi)} className="p-2 rounded-lg transition-colors text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50" title="Hapus Transaksi">
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
