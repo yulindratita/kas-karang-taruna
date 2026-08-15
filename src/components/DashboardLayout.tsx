@@ -1,13 +1,109 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter, usePathname } from 'next/navigation';
-import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Menu, X, ChevronDown, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle } from 'lucide-react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Menu, X, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types';
+
+function HeaderFilters() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [searchKeyword, setSearchKeyword] = useState(searchParams?.get('q') || '');
+  const [startDate, setStartDate] = useState(searchParams?.get('start') || '');
+  const [endDate, setEndDate] = useState(searchParams?.get('end') || '');
+
+  useEffect(() => {
+    setSearchKeyword(searchParams?.get('q') || '');
+    setStartDate(searchParams?.get('start') || '');
+    setEndDate(searchParams?.get('end') || '');
+  }, [searchParams]);
+
+  const updateFilters = (q: string, start: string, end: string) => {
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    if (q) params.set('q', q); else params.delete('q');
+    if (start) params.set('start', start); else params.delete('start');
+    if (end) params.set('end', end); else params.delete('end');
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+  };
+
+  return (
+    <div className="flex items-center justify-between flex-1 gap-4">
+      <div className="hidden md:flex items-center w-full max-w-md px-3.5 py-2.5 rounded-xl border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
+        <Search size={18} className="mr-2 opacity-50 flex-shrink-0" />
+        <input
+          type="text"
+          placeholder="Cari transaksi, kategori... (Tekan Enter)"
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              updateFilters(searchKeyword, startDate, endDate);
+            }
+          }}
+          className="bg-transparent border-none outline-none w-full text-sm placeholder-slate-400 dark:placeholder-slate-500"
+        />
+        {searchKeyword && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchKeyword('');
+              updateFilters('', startDate, endDate);
+            }}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ml-1"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
+      <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300 ml-auto">
+        <CalendarDays size={15} className="opacity-60 flex-shrink-0 text-blue-600 dark:text-cyan-400" />
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => {
+            setStartDate(e.target.value);
+            updateFilters(searchKeyword, e.target.value, endDate);
+          }}
+          className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 cursor-pointer"
+          title="Tanggal Mulai"
+        />
+        <span className="text-slate-400 font-bold">s/d</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => {
+            setEndDate(e.target.value);
+            updateFilters(searchKeyword, startDate, e.target.value);
+          }}
+          className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 cursor-pointer"
+          title="Tanggal Akhir"
+        />
+        {(startDate || endDate) && (
+          <button
+            type="button"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+              updateFilters(searchKeyword, '', '');
+            }}
+            className="ml-1 text-slate-400 hover:text-rose-500"
+            title="Reset Filter Tanggal"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -149,7 +245,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     await supabase.auth.signOut();
     window.location.href = '/'; 
   };
-  // ----------------------------------------------
 
   const toggleSidebar = () => {
     if (window.innerWidth >= 1024) {
@@ -224,23 +319,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300">
-        <header className="h-20 px-6 flex items-center justify-between flex-shrink-0 z-10 transition-colors bg-gray-50 dark:bg-[#090e17]">
-          <div className="flex items-center gap-4 flex-1">
-            <button onClick={toggleSidebar} className="p-2.5 rounded-xl transition-colors bg-white text-slate-500 hover:text-blue-600 border border-gray-200 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:text-cyan-400 dark:border-slate-800">
-              <Menu size={20} />
-            </button>
-            <div className="hidden md:flex items-center w-full max-w-md px-4 py-2.5 rounded-xl border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
-              <Search size={18} className="mr-2 opacity-50" />
-              <input type="text" placeholder="Cari transaksi, kategori..." className="bg-transparent border-none outline-none w-full text-sm placeholder-slate-500" />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
-              <CalendarDays size={16} className="mr-2" />
-              <span>1 Jan - 31 Des {new Date().getFullYear()}</span>
-              <ChevronDown size={14} className="ml-3 opacity-50" />
-            </div>
-          </div>
+        <header className="h-20 px-6 flex items-center justify-between flex-shrink-0 z-10 transition-colors bg-gray-50 dark:bg-[#090e17] gap-4">
+          <button onClick={toggleSidebar} className="p-2.5 rounded-xl transition-colors bg-white text-slate-500 hover:text-blue-600 border border-gray-200 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:text-cyan-400 dark:border-slate-800 flex-shrink-0">
+            <Menu size={20} />
+          </button>
+          
+          <Suspense fallback={<div className="flex-1" />}>
+            <HeaderFilters />
+          </Suspense>
         </header>
 
         <div className={`flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pt-0 transition-opacity duration-300 ${isPageLoading ? 'opacity-50' : 'opacity-100'}`}>
