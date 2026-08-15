@@ -146,3 +146,82 @@ Penulisan *conditional class* (ternary operator) untuk *Dark Mode* membuat kode 
    <div className="p-6 rounded-2xl border bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800">
    ```
 3. Sisir file `src/app/page.tsx` dan `src/components/DashboardLayout.tsx` dan hapus variabel pengecekan `isDarkMode` di dalam `className`, ganti dengan pendekatan *utility class* `dark:text-slate-400`, `dark:bg-slate-800`, dsb.
+
+---
+
+## Issue 5: Bug Login Role PENGAWAS Bisa Menghapus Transaksi (KRITIKAL)
+
+**Masalah:**
+Di `src/app/page.tsx`, tabel Riwayat Terbaru merender kolom "Aksi" dengan tombol "Hapus" (Ikon `Trash2`) untuk *semua pengguna* tanpa mengecek *role* otorisasinya. Akibatnya, `PENGAWAS` (yang seharusnya read-only) atau pengguna yang tidak berhak dapat melihat tombol hapus dan memicu fungsi hapus. State tentang `role` saat ini hanya ada di `DashboardLayout.tsx` dan tidak tersedia di `page.tsx`.
+
+**Tugas (Tasks):**
+
+1. **Ambil Data Role User di `src/app/page.tsx`**
+   Tambahkan state `userRole` dan fungsi untuk mengambil *profile user* ke dalam file `page.tsx`.
+   
+   *1. Tambahkan State (di bawah state lain):*
+   ```tsx
+   const [userRole, setUserRole] = useState<string>('');
+   ```
+
+   *2. Buat fungsi logika pengambilan role di dalam `page.tsx`:*
+   ```tsx
+   const fetchUserRole = async () => {
+     const { data: { session } } = await supabase.auth.getSession();
+     if (session) {
+       const { data: profil } = await supabase.from('users_profile').select('role').eq('id', session.user.id).single();
+       if (profil) setUserRole(profil.role);
+     }
+   };
+   ```
+
+   *3. Panggil fungsi di `useEffect`:*
+   ```tsx
+   useEffect(() => { 
+     fetchDataDashboard(); 
+     fetchUserRole();
+   }, []);
+   ```
+
+2. **Kondisikan Tombol Hapus Berdasarkan Role (Frontend)**
+   Sembunyikan kolom "Aksi" di dalam tabel jika user BUKAN `SUPER_ADMIN` atau `BENDAHARA`.
+   
+   *1. Buat variabel boolean untuk hak akses:*
+   ```tsx
+   const isBisaEdit = userRole === 'SUPER_ADMIN' || userRole === 'BENDAHARA';
+   ```
+
+   *2. Pada tag `<thead>` Tabel (Baris Header Aksi):*
+   ```tsx
+   {/* Tampilkan kolom Aksi HANYA JIKA bisa edit */}
+   {isBisaEdit && <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>}
+   ```
+
+   *3. Pada tag `<tbody>` dalam `transaksi.map()` (Kolom Tombol):*
+   ```tsx
+   {isBisaEdit && (
+     <td className="py-4 px-6 text-center">
+       <button onClick={() => handleHapus(item.id_transaksi)} className="p-2 rounded-lg transition-colors text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
+         <Trash2 size={16} />
+       </button>
+     </td>
+   )}
+   ```
+
+3. **Terapkan Kebijakan Keamanan (RLS) di Database Supabase (Backend)**
+   Keamanan di antarmuka (frontend) bisa dibobol jika *endpoint* database dibiarkan terbuka. Lindungi tabel transaksi Anda secara absolut melalui SQL. Jalankan SQL ini di **SQL Editor Supabase**:
+   
+   ```sql
+   -- Aktifkan RLS pada tabel transaksi
+   ALTER TABLE transaksi ENABLE ROW LEVEL SECURITY;
+
+   -- Hapus policy delete lama jika sudah ada (Opsional, amankan jika perlu)
+   -- DROP POLICY IF EXISTS "Izinkan hapus hanya untuk admin/bendahara" ON transaksi;
+
+   -- Buat aturan yang MENGUNCI fitur hapus dari sembarang user
+   CREATE POLICY "Izinkan hapus hanya untuk admin/bendahara" ON transaksi
+   FOR DELETE
+   USING (
+     (SELECT role FROM users_profile WHERE id = auth.uid()) IN ('SUPER_ADMIN', 'BENDAHARA')
+   );
+   ```
