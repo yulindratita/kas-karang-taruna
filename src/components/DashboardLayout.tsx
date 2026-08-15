@@ -115,8 +115,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [isPageLoading, setIsPageLoading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // FIX HYDRATION ERROR: Tambahkan state isMounted
+  const [isMounted, setIsMounted] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true); // Default statis untuk server render
 
   // State untuk Pop-up Login
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -124,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // State Pop-up Konfirmasi Kustom (Untuk Logout & lainnya jika diperlukan)
+  // State Pop-up Konfirmasi Kustom
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: '',
@@ -134,13 +137,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     onConfirm: () => {}
   });
 
+  // FIX HYDRATION ERROR: Pindahkan pembacaan localStorage ke useEffect
   useEffect(() => {
-    setIsPageLoading(true);
-    const timer = setTimeout(() => setIsPageLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, [pathname]);
-
-  useEffect(() => {
+    setIsMounted(true);
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       setIsDarkMode(false);
@@ -150,6 +149,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsPageLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
   const toggleTheme = () => {
     if (isDarkMode) {
@@ -228,7 +232,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  // --- ALUR LOGOUT DENGAN CUSTOM CONFIRMATION ---
   const handleLogout = () => {
     setConfirmDialog({
       isOpen: true,
@@ -292,9 +295,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             
           </div>
+          
+          {/* FIX HYDRATION ERROR: Terapkan pengecekan isMounted di sini */}
           <div className="mt-3 flex items-center justify-between p-1.5 rounded-lg bg-slate-200 dark:bg-[#0f172a]">
-            <span className="text-[10px] font-bold ml-2 text-slate-600 dark:text-slate-400">{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
-            <button onClick={toggleTheme} className="p-1.5 rounded-md shadow-sm transition-all bg-white text-amber-500 dark:bg-cyan-500 dark:text-white">{isDarkMode ? <Moon size={14} /> : <Sun size={14} />}</button>
+            <span className="text-[10px] font-bold ml-2 text-slate-600 dark:text-slate-400">
+              {!isMounted ? 'Memuat...' : (isDarkMode ? 'Dark Mode' : 'Light Mode')}
+            </span>
+            <button onClick={toggleTheme} className="p-1.5 rounded-md shadow-sm transition-all bg-white text-amber-500 dark:bg-cyan-500 dark:text-white">
+              {!isMounted ? <Moon size={14} /> : (isDarkMode ? <Moon size={14} /> : <Sun size={14} />)}
+            </button>
           </div>
         </div>
 

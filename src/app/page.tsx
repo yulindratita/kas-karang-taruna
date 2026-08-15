@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+// import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Trash2, AlertTriangle, ArrowRight, ArrowDownToLine, ArrowUpFromLine, Wallet, TrendingUp, FilterX } from 'lucide-react';
 import Link from 'next/link';
@@ -32,14 +33,8 @@ function DashboardContent() {
   const [totalMasuk, setTotalMasuk] = useState(0);
   const [totalKeluar, setTotalKeluar] = useState(0);
 
-  // State Pop-up Konfirmasi Kustom
   const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Ya, Lanjutkan',
-    isDanger: false,
-    onConfirm: () => {}
+    isOpen: false, title: '', message: '', confirmText: 'Ya, Lanjutkan', isDanger: false, onConfirm: () => {}
   });
 
   const fetchUserRole = async () => {
@@ -58,6 +53,15 @@ function DashboardContent() {
 
   const fetchDataDashboard = async () => {
     setIsLoading(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let currentRole = 'PENGAWAS';
+      if (session) {
+        const { data: profile } = await supabase.from('users_profile').select('role').eq('id', session.user.id).single();
+        if (profile) currentRole = profile.role?.toUpperCase() || 'PENGAWAS';
+      }
+      setUserRole(currentRole);
 
     let query = supabase
       .from('transaksi')
@@ -122,6 +126,10 @@ function DashboardContent() {
     }
 
     setIsLoading(false);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => { 
@@ -156,10 +164,15 @@ function DashboardContent() {
     setConfirmDialog({
       isOpen: true,
       title: 'Hapus Transaksi',
-      message: 'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan dan akan mempengaruhi saldo akhir.',
+      message: 'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.',
       confirmText: 'Ya, Hapus',
       isDanger: true,
-      onConfirm: () => eksekusiHapus(id)
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
+        if (error) alert('Gagal menghapus: ' + error.message);
+        else fetchDataDashboard();
+      }
     });
   };
 
@@ -416,3 +429,11 @@ export default function Dashboard() {
     </DashboardLayout>
   );
 }
+
+// export default function Dashboard() {
+//   return (
+//     <Suspense fallback={<div className="h-screen w-screen bg-[#090e17] flex items-center justify-center text-cyan-400 font-bold">Memuat Dashboard...</div>}>
+//       <DashboardContent />
+//     </Suspense>
+//   );
+// }
