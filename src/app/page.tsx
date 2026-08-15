@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Trash2, AlertTriangle, ArrowRight, ArrowDownToLine, ArrowUpFromLine, Wallet } from 'lucide-react';
 import Link from 'next/link';
@@ -15,19 +16,23 @@ export default function Dashboard() {
   const [totalSaldo, setTotalSaldo] = useState(0);
   const [totalMasuk, setTotalMasuk] = useState(0);
   const [totalKeluar, setTotalKeluar] = useState(0);
+  const [chartData, setChartData] = useState<any[]>([]);
 
-  // State Pop-up Konfirmasi Kustom
   const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Ya, Lanjutkan',
-    isDanger: false,
-    onConfirm: () => {}
+    isOpen: false, title: '', message: '', confirmText: 'Ya, Lanjutkan', isDanger: false, onConfirm: () => {}
   });
 
   const fetchDataDashboard = async () => {
     setIsLoading(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let currentRole = 'PENGAWAS';
+      if (session) {
+        const { data: profile } = await supabase.from('users_profile').select('role').eq('id', session.user.id).single();
+        if (profile) currentRole = profile.role?.toUpperCase() || 'PENGAWAS';
+      }
+      setUserRole(currentRole);
 
     // 1. Ambil statistik via Supabase RPC (dengan fallback jika RPC belum dibuat di Supabase)
     const { data: statData, error: statError } = await supabase.rpc('get_statistik_kas');
@@ -53,13 +58,10 @@ export default function Dashboard() {
       }
     }
 
-    // 2. Ambil 5 riwayat terbaru
-    const { data: riwayatTerbaru } = await supabase
-      .from('transaksi')
-      .select('*, kegiatan(nama_kegiatan), kategori(nama_kategori)')
-      .order('tanggal_transaksi', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(5);
+      if (semuaData) {
+        let masuk = 0;
+        let keluar = 0;
+        const rekapHarian: Record<string, { tanggal: string, Pemasukan: number, Pengeluaran: number }> = {};
 
     if (riwayatTerbaru) {
       setTransaksi(riwayatTerbaru as Transaksi[]);
@@ -75,10 +77,15 @@ export default function Dashboard() {
     setConfirmDialog({
       isOpen: true,
       title: 'Hapus Transaksi',
-      message: 'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan dan akan mempengaruhi saldo akhir.',
+      message: 'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.',
       confirmText: 'Ya, Hapus',
       isDanger: true,
-      onConfirm: () => eksekusiHapus(id)
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
+        if (error) alert('Gagal menghapus: ' + error.message);
+        else fetchDataDashboard();
+      }
     });
   };
 
@@ -102,7 +109,7 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Ringkasan kondisi finansial organisasi secara real-time.</p>
         </div>
 
-        {/* 3 KARTU STATISTIK (DASHBOARD CARDS) */}
+        {/* 3 KARTU STATISTIK */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* Kartu Saldo Total */}
@@ -146,8 +153,32 @@ export default function Dashboard() {
             </div>
             <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Jumlah total dana keluar (Kredit)</p>
           </div>
-
         </div>
+
+        {/* GRAFIK ARUS KAS (Hanya di-render jika isMounted === true) */}
+        {!isLoading && isMounted && chartData.length > 0 && (
+          <div className={`p-6 rounded-2xl border shadow-sm transition-colors ${isDarkMode ? 'bg-[#0f172a] border-slate-800/80' : 'bg-white border-gray-200'}`}>
+            <h3 className="text-lg font-bold mb-6">Tren Arus Kas (Berdasarkan Filter)</h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#1e293b' : '#e2e8f0'} vertical={false} />
+                  <XAxis dataKey="tanggal" stroke={isDarkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={isDarkMode ? '#64748b' : '#94a3b8'} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `Rp${value / 1000}k`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0', borderRadius: '12px' }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                    labelStyle={{ color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '4px' }}
+                    formatter={(value: number) => formatRupiah(value)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
+                  <Line type="monotone" dataKey="Pemasukan" stroke="#2dd4bf" strokeWidth={3} dot={{ r: 4, fill: '#2dd4bf', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Pemasukan (+)" />
+                  <Line type="monotone" dataKey="Pengeluaran" stroke="#fb7185" strokeWidth={3} dot={{ r: 4, fill: '#fb7185', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Pengeluaran (-)" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* TABEL RIWAYAT TERBARU */}
         <div className="rounded-2xl border shadow-sm overflow-hidden transition-colors bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80">
@@ -166,7 +197,7 @@ export default function Dashboard() {
                   <th className="py-4 px-6 font-semibold">Deskripsi</th>
                   <th className="py-4 px-6 font-semibold">Kategori</th>
                   <th className="py-4 px-6 font-semibold text-right">Jumlah</th>
-                  <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>
+                  {isBisaEdit && <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-800/80">
@@ -230,5 +261,13 @@ export default function Dashboard() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen bg-[#090e17] flex items-center justify-center text-cyan-400 font-bold">Memuat Dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
