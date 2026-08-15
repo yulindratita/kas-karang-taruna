@@ -225,3 +225,120 @@ Di `src/app/page.tsx`, tabel Riwayat Terbaru merender kolom "Aksi" dengan tombol
      (SELECT role FROM users_profile WHERE id = auth.uid()) IN ('SUPER_ADMIN', 'BENDAHARA')
    );
    ```
+
+---
+
+## Issue 6: Aktifasi Filter Global & Penambahan Line Chart (MENENGAH)
+
+**Masalah:**
+Input *Search* (Pencarian) dan *Date Range* (Periode Tanggal) di *header* `DashboardLayout.tsx` saat ini hanya berupa tampilan UI mati (statis). Selain itu, *dashboard* belum memiliki visualisasi grafik pergerakan kas.
+
+**Tugas (Tasks):**
+
+**Tahap 1: Sinkronisasi Filter ke URL (di `src/components/DashboardLayout.tsx`)**
+Agar filter dapat digunakan oleh halaman anak (seperti `page.tsx`), kita akan menggunakan URL Parameters (`?q=...&start=...`).
+1. **Import Hooks Next.js**:
+   ```tsx
+   import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+   ```
+2. **Definisikan State Filter**:
+   Gunakan default bulan ini, lalu sinkronkan jika ada URL parameter.
+   ```tsx
+   const searchParams = useSearchParams();
+   const querySearch = searchParams.get('q') || '';
+   const queryStart = searchParams.get('start') || '';
+   const queryEnd = searchParams.get('end') || '';
+
+   const [searchKeyword, setSearchKeyword] = useState(querySearch);
+   const [startDate, setStartDate] = useState(queryStart);
+   const [endDate, setEndDate] = useState(queryEnd);
+   ```
+3. **Fungsi Update URL**:
+   Buat fungsi untuk mengupdate URL setiap kali filter diubah.
+   ```tsx
+   const updateFilter = (q: string, start: string, end: string) => {
+     const params = new URLSearchParams(searchParams.toString());
+     if (q) params.set('q', q); else params.delete('q');
+     if (start) params.set('start', start); else params.delete('start');
+     if (end) params.set('end', end); else params.delete('end');
+     router.push(`${pathname}?${params.toString()}`);
+   };
+   ```
+4. **Hubungkan UI ke State**:
+   - Pada tag `<input type="text" placeholder="Cari transaksi..."/>` berikan `value={searchKeyword}` dan handler `onChange` + `onKeyDown={e => e.key === 'Enter' && updateFilter(searchKeyword, startDate, endDate)}`.
+   - Ganti *placeholder* rentang tanggal menjadi `<input type="date">` untuk `startDate` dan `endDate`, dan panggil `updateFilter` pada saat `onChange`.
+
+**Tahap 2: Menambahkan Library Chart**
+1. Buka terminal, lalu jalankan perintah:
+   ```bash
+   npm install recharts
+   ```
+
+**Tahap 3: Implementasi Filter dan Line Chart (di `src/app/page.tsx`)**
+1. **Import Recharts & Next.js Hooks**:
+   ```tsx
+   import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+   import { useSearchParams } from 'next/navigation';
+   ```
+2. **Tambahkan State Chart Data & Ambil Parameter**:
+   ```tsx
+   const searchParams = useSearchParams();
+   const q = searchParams.get('q') || '';
+   const start = searchParams.get('start') || '';
+   const end = searchParams.get('end') || '';
+   
+   // State baru untuk data grafik
+   const [chartData, setChartData] = useState<any[]>([]);
+   ```
+3. **Modifikasi `fetchDataDashboard` Agar Mendukung Filter**:
+   - Jika *filter* aktif, RPC agregasi global *tidak bisa dipakai* karena data di layar harus menyesuaikan filter. Gunakan `.select()` ke tabel `transaksi`.
+   ```tsx
+   let query = supabase.from('transaksi').select('*, kegiatan(nama_kegiatan), kategori(nama_kategori)').order('tanggal_transaksi', { ascending: true });
+   
+   if (start) query = query.gte('tanggal_transaksi', start);
+   if (end) query = query.lte('tanggal_transaksi', end);
+   if (q) query = query.ilike('detail_transaksi', `%${q}%`); // Opsi tambahan: ilike('jenis_transaksi')
+   ```
+   - Setelah data (`semuaData`) difetch, olah data tersebut menjadi 3 hal sekaligus:
+     * Menghitung `totalMasuk`, `totalKeluar`, `totalSaldo`.
+     * Mengambil 5 data terbaru untuk tabel (dengan fungsi `slice(-5).reverse()`).
+     * **Mengelompokkan data per tanggal** untuk `chartData`.
+     ```typescript
+     // Algoritma grouping untuk Chart:
+     const grouped = semuaData.reduce((acc: any, curr: any) => {
+       const date = curr.tanggal_transaksi;
+       if (!acc[date]) acc[date] = { tanggal: date, Pemasukan: 0, Pengeluaran: 0 };
+       acc[date][curr.jenis_transaksi] += curr.jumlah;
+       return acc;
+     }, {});
+     setChartData(Object.values(grouped));
+     ```
+4. **Tambahkan UI Line Chart**:
+   - Letakkan di antara "3 Kartu Statistik" dan "Tabel Riwayat Terbaru".
+   ```tsx
+   {/* WIDGET GRAFIK */}
+   <div className="p-6 rounded-2xl border shadow-sm bg-white dark:bg-[#0f172a] border-gray-200 dark:border-slate-800/80 mb-6">
+     <h3 className="text-lg font-bold mb-4">Tren Mutasi Kas</h3>
+     <div className="h-72 w-full">
+       <ResponsiveContainer width="100%" height="100%">
+         <LineChart data={chartData}>
+           <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+           <XAxis dataKey="tanggal" fontSize={12} tickMargin={10} />
+           <YAxis fontSize={12} tickFormatter={(val) => `Rp${val/1000}K`} />
+           <Tooltip formatter={(value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value)} />
+           <Legend />
+           <Line type="monotone" dataKey="Pemasukan" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+           <Line type="monotone" dataKey="Pengeluaran" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+         </LineChart>
+       </ResponsiveContainer>
+     </div>
+   </div>
+   ```
+5. **Tambahkan Dependency Array pada `useEffect`**:
+   Ubah `useEffect` di `page.tsx` agar memanggil fetch ulang jika URL params berubah.
+   ```tsx
+   useEffect(() => { 
+     fetchDataDashboard(); 
+     fetchUserRole();
+   }, [q, start, end]); // <--- Tambahkan depedency ini
+   ```
