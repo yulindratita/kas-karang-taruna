@@ -445,3 +445,43 @@ Di layar HP (*mobile Android/iOS*), input pencarian dan filter tanggal disembuny
      manifest: "/manifest.json",
    };
    ```
+
+---
+
+## Issue 8: Bug Filter Search & Date Picker Muncul di Semua Halaman (KRITIKAL)
+
+**Masalah:**
+Komponen `HeaderFilters` (yang berisi input pencarian dan date picker) dirender di dalam `DashboardLayout.tsx` di area `<header>`. Karena `DashboardLayout` adalah *layout wrapper* yang dipakai oleh **semua halaman** (Kegiatan, Kategori, Laporan, dll), maka filter tersebut ikut muncul di halaman yang tidak membutuhkannya. Filter ini seharusnya **hanya muncul di halaman Dashboard (`/`)**.
+
+**File Target:** `src/components/DashboardLayout.tsx`
+
+**Tugas (Tasks):**
+
+1. Cari baris berikut di dalam fungsi `return` komponen `DashboardLayout` (sekitar baris 327-329):
+
+   *Sebelum:*
+   ```tsx
+   <Suspense fallback={<div className="flex-1" />}>
+     <HeaderFilters />
+   </Suspense>
+   ```
+
+2. Bungkus dengan kondisi `pathname === '/'` agar hanya muncul di halaman Dashboard:
+
+   *Sesudah:*
+   ```tsx
+   {pathname === '/' ? (
+     <Suspense fallback={<div className="flex-1" />}>
+       <HeaderFilters />
+     </Suspense>
+   ) : (
+     <div className="flex-1" />
+   )}
+   ```
+
+   **Penjelasan:** Variabel `pathname` sudah tersedia di komponen `DashboardLayout` (didapat dari `usePathname()`). Ketika halaman bukan `/`, kita render `<div className="flex-1" />` sebagai *spacer* kosong agar layout header tetap rapi.
+
+**Verifikasi:**
+- Buka halaman Dashboard (`/`) → Filter pencarian dan tanggal **harus terlihat**.
+- Buka halaman Kegiatan, Kategori, Laporan → Filter **tidak boleh muncul**.
+- Jalankan `npm run build` untuk memastikan tidak ada error.
