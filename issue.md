@@ -342,3 +342,106 @@ Agar filter dapat digunakan oleh halaman anak (seperti `page.tsx`), kita akan me
      fetchUserRole();
    }, [q, start, end]); // <--- Tambahkan depedency ini
    ```
+
+---
+
+## Issue 7: Optimasi UI/UX Mobile (Filter Responsif & Layout Card) (MENENGAH)
+
+**Masalah:**
+Di layar HP (*mobile Android/iOS*), input pencarian dan filter tanggal disembunyikan total karena kendala ruang (menggunakan `hidden md:flex`). Selain itu, tabel data memanjang ke kanan (*horizontal scroll*) sehingga tidak ergonomis saat dilihat di layar kecil.
+
+**Tugas (Tasks):**
+
+**Tahap 1: Memperbaiki Filter yang Hilang di Layar Kecil (`src/components/DashboardLayout.tsx`)**
+1. Buka file `src/components/DashboardLayout.tsx`.
+2. Pada komponen `HeaderFilters` (di fungsi `return`), kita akan merubah agar filter membungkus (*wrap*) saat ruang menyempit.
+   - **Ganti struktur pembungkus utama** dari `<div className="flex items-center justify-between flex-1 gap-4">` menjadi:
+     ```tsx
+     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between flex-1 gap-3 w-full">
+     ```
+   - **Hapus pengekang responsif** pada *Search Input*: Ganti `<div className="hidden md:flex items-center w-full max-w-md ...">` menjadi `<div className="flex items-center w-full max-w-md ...">`.
+   - **Hapus pengekang responsif** pada *Date Range*: Ganti `<div className="hidden sm:flex items-center gap-2 ...">` menjadi `<div className="flex items-center gap-2 ... w-full sm:w-auto">`.
+
+**Tahap 2: Merubah Tabel Riwayat menjadi Format Kartu (Cards) di Mobile (`src/app/page.tsx`)**
+1. Buka file `src/app/page.tsx`.
+2. Sembunyikan tabel bawaan khusus di *mobile* dengan menambahkan `hidden md:block` pada `div` pembungkus tabel:
+   ```tsx
+   <div className="hidden md:block overflow-x-auto">
+     <table className="w-full text-left whitespace-nowrap">
+       {/* ... isi tabel ... */}
+     </table>
+   </div>
+   ```
+3. Tambahkan tampilan alternatif **Daftar Kartu (Cards)** tepat di bawah blok tabel tersebut. Tampilan ini khusus untuk HP (`md:hidden`):
+   ```tsx
+   {/* TAMPILAN KARTU UNTUK MOBILE */}
+   <div className="md:hidden flex flex-col divide-y divide-gray-100 dark:divide-slate-800/80">
+     {isLoading ? (
+       <div className="p-8 text-center text-sm opacity-50">Memuat riwayat...</div>
+     ) : transaksi.length === 0 ? (
+       <div className="p-8 text-center text-sm opacity-50">Tidak ada transaksi ditemukan.</div>
+     ) : (
+       transaksi.map((item) => {
+         const isPemasukan = item.jenis_transaksi === 'Pemasukan';
+         return (
+           <div key={item.id_transaksi} className="p-4 flex flex-col gap-2 hover:bg-gray-50 dark:hover:bg-slate-800/40">
+             <div className="flex justify-between items-start">
+               <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                 {item.detail_transaksi || item.kegiatan?.nama_kegiatan || '-'}
+               </p>
+               <span className={`font-black text-sm whitespace-nowrap ml-3 ${isPemasukan ? 'text-emerald-600 dark:text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
+                 {isPemasukan ? '+' : '-'}{formatRupiah(item.jumlah)}
+               </span>
+             </div>
+             <div className="flex justify-between items-center mt-1">
+               <span className="text-xs text-slate-500 dark:text-slate-400">{item.tanggal_transaksi}</span>
+               <div className="flex items-center gap-2">
+                 <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-400">
+                   {item.kategori?.nama_kategori || '-'}
+                 </span>
+                 {isBisaEdit && (
+                   <button onClick={() => handleHapus(item.id_transaksi)} className="p-1 rounded text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50">
+                     <Trash2 size={14} />
+                   </button>
+                 )}
+               </div>
+             </div>
+           </div>
+         );
+       })
+     )}
+   </div>
+   ```
+
+**Tahap 3: Jadikan Aplikasi Android Native-like (PWA)**
+1. Buat file `public/manifest.json`.
+   ```json
+   {
+     "name": "Kas Karang Taruna",
+     "short_name": "KasKita",
+     "icons": [
+       {
+         "src": "/logo.png",
+         "sizes": "192x192",
+         "type": "image/png"
+       },
+       {
+         "src": "/logo.png",
+         "sizes": "512x512",
+         "type": "image/png"
+       }
+     ],
+     "theme_color": "#090e17",
+     "background_color": "#ffffff",
+     "display": "standalone",
+     "orientation": "portrait"
+   }
+   ```
+2. Di file `src/app/layout.tsx`, tambahkan tag manifest di head:
+   ```tsx
+   export const metadata: Metadata = {
+     title: "Dashboard Kas",
+     description: "Sistem Manajemen Kas",
+     manifest: "/manifest.json",
+   };
+   ```
