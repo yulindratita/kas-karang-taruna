@@ -34,8 +34,8 @@ function HeaderFilters() {
   };
 
   return (
-    <div className="flex items-center justify-between flex-1 gap-4">
-      <div className="hidden md:flex items-center w-full max-w-md px-3.5 py-2.5 rounded-xl border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between flex-1 gap-3 w-full">
+      <div className="flex items-center w-full sm:max-w-md px-3.5 py-2.5 rounded-xl border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
         <Search size={18} className="mr-2 opacity-50 flex-shrink-0" />
         <input
           type="text"
@@ -63,7 +63,7 @@ function HeaderFilters() {
         )}
       </div>
 
-      <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300 ml-auto">
+      <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300 w-full sm:w-auto sm:ml-auto">
         <CalendarDays size={15} className="opacity-60 flex-shrink-0 text-blue-600 dark:text-cyan-400" />
         <input
           type="date"

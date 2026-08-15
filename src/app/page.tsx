@@ -293,7 +293,8 @@ function DashboardContent() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* TABEL DESKTOP */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left whitespace-nowrap">
             <thead>
               <tr className="text-xs uppercase tracking-widest border-b bg-gray-50 text-slate-500 border-gray-200 dark:bg-[#111827] dark:text-slate-400 dark:border-slate-800">
@@ -339,6 +340,44 @@ function DashboardContent() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* TAMPILAN KARTU UNTUK MOBILE */}
+        <div className="md:hidden flex flex-col divide-y divide-gray-100 dark:divide-slate-800/80">
+          {isLoading ? (
+            <div className="p-8 text-center text-sm opacity-50">Memuat riwayat...</div>
+          ) : transaksi.length === 0 ? (
+            <div className="p-8 text-center text-sm opacity-50">Tidak ada transaksi ditemukan.</div>
+          ) : (
+            transaksi.map((item) => {
+              const isPemasukan = item.jenis_transaksi === 'Pemasukan';
+              return (
+                <div key={item.id_transaksi} className="p-4 flex flex-col gap-2 hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200 flex-1 mr-3">
+                      {item.detail_transaksi || item.kegiatan?.nama_kegiatan || '-'}
+                    </p>
+                    <span className={`font-black text-sm whitespace-nowrap ${isPemasukan ? 'text-emerald-600 dark:text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
+                      {isPemasukan ? '+' : '-'}{formatRupiah(item.jumlah)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.tanggal_transaksi}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-400">
+                        {item.kategori?.nama_kategori || '-'}
+                      </span>
+                      {isBisaEdit && (
+                        <button onClick={() => handleHapus(item.id_transaksi)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
