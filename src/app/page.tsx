@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-// import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Trash2, AlertTriangle, ArrowRight, ArrowDownToLine, ArrowUpFromLine, Wallet, TrendingUp, FilterX } from 'lucide-react';
 import Link from 'next/link';
@@ -63,71 +62,70 @@ function DashboardContent() {
       }
       setUserRole(currentRole);
 
-    let query = supabase
-      .from('transaksi')
-      .select('*, kegiatan(nama_kegiatan), kategori(nama_kategori)')
-      .order('tanggal_transaksi', { ascending: true })
-      .order('created_at', { ascending: true });
+      let query = supabase
+        .from('transaksi')
+        .select('*, kegiatan(nama_kegiatan), kategori(nama_kategori)')
+        .order('tanggal_transaksi', { ascending: true })
+        .order('created_at', { ascending: true });
 
-    if (start) query = query.gte('tanggal_transaksi', start);
-    if (end) query = query.lte('tanggal_transaksi', end);
+      if (start) query = query.gte('tanggal_transaksi', start);
+      if (end) query = query.lte('tanggal_transaksi', end);
 
-    const { data, error } = await query;
+      const { data, error } = await query;
 
-    if (!error && data) {
-      let filteredData = data as Transaksi[];
+      if (!error && data) {
+        let filteredData = data as Transaksi[];
 
-      // Filter pencarian teks di client (mencakup detail_transaksi, nama_kategori, nama_kegiatan, jenis_transaksi)
-      if (q) {
-        const queryLower = q.toLowerCase();
-        filteredData = filteredData.filter((item) => {
-          const detailMatch = item.detail_transaksi?.toLowerCase().includes(queryLower);
-          const kategoriMatch = item.kategori?.nama_kategori?.toLowerCase().includes(queryLower);
-          const kegiatanMatch = item.kegiatan?.nama_kegiatan?.toLowerCase().includes(queryLower);
-          const jenisMatch = item.jenis_transaksi?.toLowerCase().includes(queryLower);
-          return detailMatch || kategoriMatch || kegiatanMatch || jenisMatch;
+        // Filter pencarian teks di client
+        if (q) {
+          const queryLower = q.toLowerCase();
+          filteredData = filteredData.filter((item) => {
+            const detailMatch = item.detail_transaksi?.toLowerCase().includes(queryLower);
+            const kategoriMatch = item.kategori?.nama_kategori?.toLowerCase().includes(queryLower);
+            const kegiatanMatch = item.kegiatan?.nama_kegiatan?.toLowerCase().includes(queryLower);
+            const jenisMatch = item.jenis_transaksi?.toLowerCase().includes(queryLower);
+            return detailMatch || kategoriMatch || kegiatanMatch || jenisMatch;
+          });
+        }
+
+        // 1. Hitung total pemasukan, pengeluaran, saldo
+        let masuk = 0;
+        let keluar = 0;
+        const groupedChart: { [key: string]: { tanggal: string; Pemasukan: number; Pengeluaran: number } } = {};
+
+        filteredData.forEach((t) => {
+          const nominal = Number(t.jumlah) || 0;
+          const tgl = t.tanggal_transaksi;
+
+          if (!groupedChart[tgl]) {
+            groupedChart[tgl] = { tanggal: tgl, Pemasukan: 0, Pengeluaran: 0 };
+          }
+
+          if (t.jenis_transaksi === 'Pemasukan') {
+            masuk += nominal;
+            groupedChart[tgl].Pemasukan += nominal;
+          } else if (t.jenis_transaksi === 'Pengeluaran') {
+            keluar += nominal;
+            groupedChart[tgl].Pengeluaran += nominal;
+          }
         });
+
+        setTotalMasuk(masuk);
+        setTotalKeluar(keluar);
+        setTotalSaldo(masuk - keluar);
+
+        // 2. Format data grafik
+        setChartData(Object.values(groupedChart));
+
+        // 3. Ambil 5 riwayat terbaru
+        const listTerbaru = [...filteredData].reverse().slice(0, 5);
+        setTransaksi(listTerbaru);
+      } else {
+        console.error("Gagal mengambil data:", error);
       }
-
-      // 1. Hitung total pemasukan, pengeluaran, saldo dari data yang terfilter
-      let masuk = 0;
-      let keluar = 0;
-      const groupedChart: { [key: string]: { tanggal: string; Pemasukan: number; Pengeluaran: number } } = {};
-
-      filteredData.forEach((t) => {
-        const nominal = Number(t.jumlah) || 0;
-        const tgl = t.tanggal_transaksi;
-
-        if (!groupedChart[tgl]) {
-          groupedChart[tgl] = { tanggal: tgl, Pemasukan: 0, Pengeluaran: 0 };
-        }
-
-        if (t.jenis_transaksi === 'Pemasukan') {
-          masuk += nominal;
-          groupedChart[tgl].Pemasukan += nominal;
-        } else if (t.jenis_transaksi === 'Pengeluaran') {
-          keluar += nominal;
-          groupedChart[tgl].Pengeluaran += nominal;
-        }
-      });
-
-      setTotalMasuk(masuk);
-      setTotalKeluar(keluar);
-      setTotalSaldo(masuk - keluar);
-
-      // 2. Format data grafik
-      setChartData(Object.values(groupedChart));
-
-      // 3. Ambil 5 riwayat terbaru (dibalik agar yang paling baru di atas)
-      const listTerbaru = [...filteredData].reverse().slice(0, 5);
-      setTransaksi(listTerbaru);
-    } else {
-      console.error("Gagal mengambil data:", error);
-    }
-
-    setIsLoading(false);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -176,13 +174,6 @@ function DashboardContent() {
     });
   };
 
-  // const eksekusiHapus = async (id: string) => {
-  //   setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-  //   const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-  //   if (error) alert('Gagal menghapus: ' + error.message);
-  //   else fetchDataDashboard();
-  // };
-
   const formatRupiah = (angka: number) => 
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
@@ -206,7 +197,7 @@ function DashboardContent() {
         )}
       </div>
 
-      {/* 3 KARTU STATISTIK (DASHBOARD CARDS) */}
+      {/* 3 KARTU STATISTIK */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Kartu Saldo Total */}
@@ -255,7 +246,7 @@ function DashboardContent() {
 
       </div>
 
-      {/* GRAFIK TREN MUTASI KAS (LINE CHART) */}
+      {/* GRAFIK TREN MUTASI KAS */}
       <div className="p-6 rounded-2xl border shadow-sm transition-colors bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
@@ -429,11 +420,3 @@ export default function Dashboard() {
     </DashboardLayout>
   );
 }
-
-// export default function Dashboard() {
-//   return (
-//     <Suspense fallback={<div className="h-screen w-screen bg-[#090e17] flex items-center justify-center text-cyan-400 font-bold">Memuat Dashboard...</div>}>
-//       <DashboardContent />
-//     </Suspense>
-//   );
-// }
