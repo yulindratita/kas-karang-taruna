@@ -176,12 +176,12 @@ function DashboardContent() {
     });
   };
 
-  const eksekusiHapus = async (id: string) => {
-    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-    const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-    if (error) alert('Gagal menghapus: ' + error.message);
-    else fetchDataDashboard();
-  };
+  // const eksekusiHapus = async (id: string) => {
+  //   setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+  //   const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
+  //   if (error) alert('Gagal menghapus: ' + error.message);
+  //   else fetchDataDashboard();
+  // };
 
   const formatRupiah = (angka: number) => 
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
