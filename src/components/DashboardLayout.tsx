@@ -324,9 +324,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu size={20} />
           </button>
           
-          <Suspense fallback={<div className="flex-1" />}>
-            <HeaderFilters />
-          </Suspense>
+          {pathname === '/' ? (
+            <Suspense fallback={<div className="flex-1" />}>
+              <HeaderFilters />
+            </Suspense>
+          ) : null}
         </header>
 
         <div className={`flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pt-0 transition-opacity duration-300 ${isPageLoading ? 'opacity-50' : 'opacity-100'}`}>
