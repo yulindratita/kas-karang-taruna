@@ -3,16 +3,18 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Bell, Menu, X, ChevronDown, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle } from 'lucide-react';
+import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Menu, X, ChevronDown, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { User } from '@supabase/supabase-js';
+import { UserProfile } from '@/types';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   
-  const [user, setUser] = useState<any>(null);
-  const [userProfil, setUserProfil] = useState<{ nama_lengkap: string; role: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfil, setUserProfil] = useState<UserProfile | null>(null);
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
@@ -92,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (session) {
         setUser(session.user);
         const { data: profil } = await supabase.from('users_profile').select('nama_lengkap, role').eq('id', session.user.id).single(); 
-        if (profil) setUserProfil(profil);
+        if (profil) setUserProfil(profil as UserProfile);
       }
       setIsLoading(false);
     };
@@ -143,7 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const eksekusiLogout = async () => {
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
+    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
     await supabase.auth.signOut();
     window.location.href = '/'; 
   };
@@ -161,12 +163,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isBisaEdit = role === 'SUPER_ADMIN' || role === 'BENDAHARA';
 
   return (
-    <div className={`flex h-screen overflow-hidden font-sans transition-colors duration-300 ${isDarkMode ? 'bg-[#090e17] text-gray-100' : 'bg-gray-50 text-slate-900'}`}>
+    <div className="flex h-screen overflow-hidden font-sans transition-colors duration-300 bg-gray-50 text-slate-900 dark:bg-[#090e17] dark:text-gray-100">
       
       <div className={`fixed top-0 left-0 h-1 bg-cyan-500 z-[100] transition-all duration-300 ease-out ${isPageLoading ? 'w-full opacity-100' : 'w-0 opacity-0'}`} />
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
 
-      <aside className={`fixed lg:static top-0 left-0 z-50 h-full flex flex-col transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'} ${isDesktopSidebarOpen ? 'lg:w-72' : 'lg:w-0 lg:border-none lg:opacity-0'} ${isDarkMode ? 'bg-[#0f172a] border-r border-slate-800/80' : 'bg-white border-r border-gray-200'}`}>
+      <aside className={`fixed lg:static top-0 left-0 z-50 h-full flex flex-col transition-all duration-300 overflow-hidden whitespace-nowrap bg-white border-r border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80 ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'} ${isDesktopSidebarOpen ? 'lg:w-72' : 'lg:w-0 lg:border-none lg:opacity-0'}`}>
         <div className="p-6 flex items-center justify-between min-w-[288px]">
           <Link href="/" className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-full overflow-hidden bg-cyan-50 border border-cyan-100">
@@ -177,9 +179,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button className="lg:hidden text-gray-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>
         </div>
 
-        <div className={`mx-4 p-4 rounded-2xl mb-6 min-w-[256px] ${isDarkMode ? 'bg-[#1e293b]/50 border border-slate-700/50' : 'bg-slate-50 border border-slate-200'}`}>
+        <div className="mx-4 p-4 rounded-2xl mb-6 min-w-[256px] bg-slate-50 border border-slate-200 dark:bg-[#1e293b]/50 dark:border-slate-700/50">
           <div className="flex items-center gap-3 mb-4">
-            <UserCircle size={36} className={isDarkMode ? 'text-cyan-400' : 'text-blue-600'} strokeWidth={1.5} />
+            <UserCircle size={36} className="text-blue-600 dark:text-cyan-400" strokeWidth={1.5} />
             <div className="overflow-hidden">
               <p className="font-bold text-sm truncate">{userProfil?.nama_lengkap || (user ? user.email : 'Mode Publik')}</p>
               <p className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase w-max mt-1 ${role === 'SUPER_ADMIN' ? 'bg-purple-500/20 text-purple-400' : role === 'BENDAHARA' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'}`}>{role || 'PENGAWAS'}</p>
@@ -187,54 +189,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex gap-2">
             {role === 'SUPER_ADMIN' && (
-              <button onClick={() => handleAksesAdmin('/pengguna')} className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}`}><ShieldCheck size={14} className="mr-1.5" /> Akses</button>
+              <button onClick={() => handleAksesAdmin('/pengguna')} className="flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold transition-colors bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:border-transparent"><ShieldCheck size={14} className="mr-1.5" /> Akses</button>
             )}
             
-            <button onClick={user ? handleLogout : () => setIsLoginModalOpen(true)} className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold transition-colors ${isDarkMode ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-50 hover:bg-rose-100 text-rose-600'}`}>
+            <button onClick={user ? handleLogout : () => setIsLoginModalOpen(true)} className="flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold transition-colors bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400">
               {user ? <><LogOut size={14} className="mr-1.5" /> Keluar</> : <><LogIn size={14} className="mr-1.5" /> Login</>}
             </button>
             
           </div>
-          <div className={`mt-3 flex items-center justify-between p-1.5 rounded-lg ${isDarkMode ? 'bg-[#0f172a]' : 'bg-slate-200'}`}>
-            <span className={`text-[10px] font-bold ml-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
-            <button onClick={toggleTheme} className={`p-1.5 rounded-md shadow-sm transition-all ${isDarkMode ? 'bg-cyan-500 text-white' : 'bg-white text-amber-500'}`}>{isDarkMode ? <Moon size={14} /> : <Sun size={14} />}</button>
+          <div className="mt-3 flex items-center justify-between p-1.5 rounded-lg bg-slate-200 dark:bg-[#0f172a]">
+            <span className="text-[10px] font-bold ml-2 text-slate-600 dark:text-slate-400">{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
+            <button onClick={toggleTheme} className="p-1.5 rounded-md shadow-sm transition-all bg-white text-amber-500 dark:bg-cyan-500 dark:text-white">{isDarkMode ? <Moon size={14} /> : <Sun size={14} />}</button>
           </div>
         </div>
 
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto min-w-[288px]">
-          <p className={`text-[10px] font-bold uppercase tracking-widest px-2 mb-2 mt-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Menu Utama</p>
-          <Link href="/" onClick={() => setIsSidebarOpen(false)} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/' ? (isDarkMode ? 'bg-cyan-500/10 text-cyan-400 font-bold' : 'bg-blue-50 text-blue-700 font-bold') : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100')}`}><TrendingUp size={18} className="mr-3" /> Dashboard</Link>
+          <p className="text-[10px] font-bold uppercase tracking-widest px-2 mb-2 mt-4 text-slate-400 dark:text-slate-500">Menu Utama</p>
+          <Link href="/" onClick={() => setIsSidebarOpen(false)} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><TrendingUp size={18} className="mr-3" /> Dashboard</Link>
           
           {isBisaEdit && (
             <>
-              <button onClick={() => handleAksesAdmin('/kegiatan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kegiatan' ? (isDarkMode ? 'bg-cyan-500/10 text-cyan-400 font-bold' : 'bg-blue-50 text-blue-700 font-bold') : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100')}`}><List size={18} className="mr-3" /> Kegiatan</button>
-              <button onClick={() => handleAksesAdmin('/kategori')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kategori' ? (isDarkMode ? 'bg-cyan-500/10 text-cyan-400 font-bold' : 'bg-blue-50 text-blue-700 font-bold') : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100')}`}><Layers size={18} className="mr-3" /> Kategori</button>
+              <button onClick={() => handleAksesAdmin('/kegiatan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kegiatan' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><List size={18} className="mr-3" /> Kegiatan</button>
+              <button onClick={() => handleAksesAdmin('/kategori')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kategori' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><Layers size={18} className="mr-3" /> Kategori</button>
             </>
           )}
-          <button onClick={() => handleAksesAdmin('/laporan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/laporan' ? (isDarkMode ? 'bg-cyan-500/10 text-cyan-400 font-bold' : 'bg-blue-50 text-blue-700 font-bold') : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100')}`}><FileBarChart size={18} className="mr-3" /> Buku Besar</button>
+          <button onClick={() => handleAksesAdmin('/laporan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/laporan' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><FileBarChart size={18} className="mr-3" /> Buku Besar</button>
         </nav>
 
         {isBisaEdit && (
-          <div className="p-4 mt-auto border-t min-w-[288px] border-slate-800/50">
-            <button onClick={() => handleAksesAdmin('/tambah')} className={`w-full flex items-center justify-center px-4 py-3.5 rounded-xl font-bold text-sm transition-colors shadow-lg ${isDarkMode ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-900 shadow-cyan-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30'}`}><PlusCircle size={18} className="mr-2" /> Catat Kas Baru</button>
+          <div className="p-4 mt-auto border-t min-w-[288px] border-slate-200 dark:border-slate-800/50">
+            <button onClick={() => handleAksesAdmin('/tambah')} className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl font-bold text-sm transition-colors shadow-lg bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-900 dark:shadow-cyan-500/20"><PlusCircle size={18} className="mr-2" /> Catat Kas Baru</button>
           </div>
         )}
       </aside>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300">
-        <header className={`h-20 px-6 flex items-center justify-between flex-shrink-0 z-10 transition-colors ${isDarkMode ? 'bg-[#090e17]' : 'bg-gray-50'}`}>
+        <header className="h-20 px-6 flex items-center justify-between flex-shrink-0 z-10 transition-colors bg-gray-50 dark:bg-[#090e17]">
           <div className="flex items-center gap-4 flex-1">
-            <button onClick={toggleSidebar} className={`p-2.5 rounded-xl transition-colors ${isDarkMode ? 'bg-[#0f172a] text-slate-400 hover:text-cyan-400 border border-slate-800' : 'bg-white text-slate-500 hover:text-blue-600 border border-gray-200'}`}>
+            <button onClick={toggleSidebar} className="p-2.5 rounded-xl transition-colors bg-white text-slate-500 hover:text-blue-600 border border-gray-200 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:text-cyan-400 dark:border-slate-800">
               <Menu size={20} />
             </button>
-            <div className={`hidden md:flex items-center w-full max-w-md px-4 py-2.5 rounded-xl border ${isDarkMode ? 'bg-[#0f172a] border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+            <div className="hidden md:flex items-center w-full max-w-md px-4 py-2.5 rounded-xl border bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
               <Search size={18} className="mr-2 opacity-50" />
               <input type="text" placeholder="Cari transaksi, kategori..." className="bg-transparent border-none outline-none w-full text-sm placeholder-slate-500" />
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className={`hidden sm:flex items-center px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer ${isDarkMode ? 'bg-[#0f172a] border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-              <CalendarDays size={16} className="mr-2" /><span>1 Jan - 31 Des 2024</span><ChevronDown size={14} className="ml-3 opacity-50" />
+            <div className="hidden sm:flex items-center px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer bg-white border-slate-200 text-slate-600 dark:bg-[#0f172a] dark:border-slate-800 dark:text-slate-300">
+              <CalendarDays size={16} className="mr-2" />
+              <span>1 Jan - 31 Des {new Date().getFullYear()}</span>
+              <ChevronDown size={14} className="ml-3 opacity-50" />
             </div>
           </div>
         </header>
@@ -249,35 +253,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* POP-UP MODAL LOGIN KUSTOM */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className={`w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border transform transition-transform scale-100 ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
+          <div className="w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border transform transition-transform scale-100 bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-700">
             
             <div className="relative p-6 text-center">
-              <button onClick={() => setIsLoginModalOpen(false)} className={`absolute top-4 right-4 p-1.5 rounded-lg transition-colors ${isDarkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-gray-400 hover:bg-gray-100'}`}>
+              <button onClick={() => setIsLoginModalOpen(false)} className="absolute top-4 right-4 p-1.5 rounded-lg transition-colors text-gray-400 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800">
                 <X size={20} />
               </button>
               <div className="mx-auto w-16 h-16 rounded-full bg-cyan-50 border-4 border-cyan-100 overflow-hidden relative mb-4">
                 <Image src="/logo.png" alt="Logo" fill className="object-cover" />
               </div>
-              <h2 className={`text-xl font-black tracking-tight mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Selamat Datang</h2>
-              <p className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Masuk untuk mengakses menu kelola</p>
+              <h2 className="text-xl font-black tracking-tight mb-1 text-slate-900 dark:text-white">Selamat Datang</h2>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Masuk untuk mengakses menu kelola</p>
             </div>
 
             <form onSubmit={handleLoginSubmit} className="px-6 pb-8 space-y-4">
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Email Address</label>
+                <label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Email Address</label>
                 <div className="relative">
-                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><Mail size={16} /></span>
-                  <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="nama@email.com" className={`w-full p-3 pl-10 border rounded-xl outline-none font-medium text-sm transition-colors ${isDarkMode ? 'bg-[#1e293b] border-slate-700 text-slate-200 focus:border-cyan-500' : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500'}`} />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"><Mail size={16} /></span>
+                  <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="nama@email.com" className="w-full p-3 pl-10 border rounded-xl outline-none font-medium text-sm transition-colors bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:bg-[#1e293b] dark:border-slate-700 dark:text-slate-200 dark:focus:border-cyan-500" />
                 </div>
               </div>
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Password</label>
+                <label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Password</label>
                 <div className="relative">
-                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><Lock size={16} /></span>
-                  <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required placeholder="••••••••" className={`w-full p-3 pl-10 border rounded-xl outline-none font-medium text-sm transition-colors ${isDarkMode ? 'bg-[#1e293b] border-slate-700 text-slate-200 focus:border-cyan-500' : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500'}`} />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"><Lock size={16} /></span>
+                  <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required placeholder="••••••••" className="w-full p-3 pl-10 border rounded-xl outline-none font-medium text-sm transition-colors bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:bg-[#1e293b] dark:border-slate-700 dark:text-slate-200 dark:focus:border-cyan-500" />
                 </div>
               </div>
-              <button type="submit" disabled={isLoggingIn} className={`w-full mt-2 flex items-center justify-center px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg disabled:opacity-50 ${isDarkMode ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-900 shadow-cyan-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30'}`}>
+              <button type="submit" disabled={isLoggingIn} className="w-full mt-2 flex items-center justify-center px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-900 dark:shadow-cyan-500/20">
                 {isLoggingIn ? 'Memverifikasi...' : 'Masuk Sekarang'}
               </button>
             </form>
@@ -288,28 +292,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* POP-UP KONFIRMASI KUSTOM (Untuk Logout & Konfirmasi Lainnya) */}
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
+          <div className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-700">
             <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') : (isDarkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-600')}`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' : 'bg-blue-100 text-blue-600 dark:bg-cyan-500/20 dark:text-cyan-400'}`}>
                 <AlertTriangle size={24} />
               </div>
-              <h3 className={`text-lg font-black tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className="text-lg font-black tracking-tight mb-2 text-gray-900 dark:text-white">
                 {confirmDialog.title}
               </h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+              <p className="text-sm leading-relaxed text-gray-600 dark:text-slate-400">
                 {confirmDialog.message}
               </p>
             </div>
-            <div className={`px-6 py-4 flex justify-end gap-3 border-t ${isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-gray-100 bg-gray-50'}`}>
+            <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50 dark:border-slate-800 dark:bg-[#111827]">
               <button 
-                onClick={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} 
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                onClick={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))} 
+                className="px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border bg-white border-gray-300 text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 Batal
               </button>
               <button 
                 onClick={confirmDialog.onConfirm} 
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-rose-600 text-white hover:bg-rose-700') : (isDarkMode ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400' : 'bg-blue-600 text-white hover:bg-blue-700')}`}
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? 'bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600' : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-cyan-500 dark:text-slate-900 dark:hover:bg-cyan-400'}`}
               >
                 {confirmDialog.confirmText}
               </button>
