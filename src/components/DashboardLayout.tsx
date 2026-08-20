@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Menu, X, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle } from 'lucide-react';
+// Tambahan Ikon Building2 dan FolderTree di bawah ini:
+import { LogIn, LogOut, UserCircle, ShieldCheck, Sun, Moon, Search, Menu, X, TrendingUp, List, Layers, FileBarChart, PlusCircle, CalendarDays, Mail, Lock, AlertTriangle, Building2, FolderTree } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
@@ -296,7 +297,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             
           </div>
           
-          {/* FIX HYDRATION ERROR: Terapkan pengecekan isMounted di sini */}
           <div className="mt-3 flex items-center justify-between p-1.5 rounded-lg bg-slate-200 dark:bg-[#0f172a]">
             <span className="text-[10px] font-bold ml-2 text-slate-600 dark:text-slate-400">
               {!isMounted ? 'Memuat...' : (isDarkMode ? 'Dark Mode' : 'Light Mode')}
@@ -313,7 +313,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           
           {isBisaEdit && (
             <>
+              {/* === MENU DIVISI BARU === */}
+              <button onClick={() => handleAksesAdmin('/divisi')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/divisi' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><Building2 size={18} className="mr-3" /> Divisi</button>
+              
               <button onClick={() => handleAksesAdmin('/kegiatan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kegiatan' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><List size={18} className="mr-3" /> Kegiatan</button>
+              
+              {/* === MENU SUB KEGIATAN BARU === */}
+              <button onClick={() => handleAksesAdmin('/sub-kegiatan')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/sub-kegiatan' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><FolderTree size={18} className="mr-3" /> Sub Kegiatan</button>
+
               <button onClick={() => handleAksesAdmin('/kategori')} className={`w-full flex items-center px-4 py-3 rounded-xl font-medium text-sm transition-colors ${pathname === '/kategori' ? 'bg-blue-50 text-blue-700 font-bold dark:bg-cyan-500/10 dark:text-cyan-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}><Layers size={18} className="mr-3" /> Kategori</button>
             </>
           )}

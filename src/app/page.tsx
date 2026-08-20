@@ -27,7 +27,7 @@ function DashboardContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('');
 
-  // State untuk Statistik Kartu
+  // State Statistik Kartu
   const [totalSaldo, setTotalSaldo] = useState(0);
   const [totalMasuk, setTotalMasuk] = useState(0);
   const [totalKeluar, setTotalKeluar] = useState(0);
@@ -64,7 +64,7 @@ function DashboardContent() {
 
       let query = supabase
         .from('transaksi')
-        .select('*, kegiatan(nama_kegiatan), kategori(nama_kategori)')
+        .select('*, divisi(nama_divisi), kegiatan(nama_kegiatan), sub_kegiatan(nama_sub_kegiatan), kategori(nama_kategori)')
         .order('tanggal_transaksi', { ascending: true })
         .order('created_at', { ascending: true });
 
@@ -76,19 +76,19 @@ function DashboardContent() {
       if (!error && data) {
         let filteredData = data as Transaksi[];
 
-        // Filter pencarian teks di client
         if (q) {
           const queryLower = q.toLowerCase();
           filteredData = filteredData.filter((item) => {
             const detailMatch = item.detail_transaksi?.toLowerCase().includes(queryLower);
             const kategoriMatch = item.kategori?.nama_kategori?.toLowerCase().includes(queryLower);
             const kegiatanMatch = item.kegiatan?.nama_kegiatan?.toLowerCase().includes(queryLower);
+            const subMatch = item.sub_kegiatan?.nama_sub_kegiatan?.toLowerCase().includes(queryLower);
+            const divisiMatch = item.divisi?.nama_divisi?.toLowerCase().includes(queryLower);
             const jenisMatch = item.jenis_transaksi?.toLowerCase().includes(queryLower);
-            return detailMatch || kategoriMatch || kegiatanMatch || jenisMatch;
+            return detailMatch || kategoriMatch || kegiatanMatch || subMatch || divisiMatch || jenisMatch;
           });
         }
 
-        // 1. Hitung total pemasukan, pengeluaran, saldo
         let masuk = 0;
         let keluar = 0;
         const groupedChart: { [key: string]: { tanggal: string; Pemasukan: number; Pengeluaran: number } } = {};
@@ -114,10 +114,8 @@ function DashboardContent() {
         setTotalKeluar(keluar);
         setTotalSaldo(masuk - keluar);
 
-        // 2. Format data grafik
         setChartData(Object.values(groupedChart));
 
-        // 3. Ambil 5 riwayat terbaru
         const listTerbaru = [...filteredData].reverse().slice(0, 5);
         setTransaksi(listTerbaru);
       } else {
@@ -166,7 +164,7 @@ function DashboardContent() {
       confirmText: 'Ya, Hapus',
       isDanger: true,
       onConfirm: async () => {
-        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
         if (error) alert('Gagal menghapus: ' + error.message);
         else fetchDataDashboard();
@@ -199,8 +197,6 @@ function DashboardContent() {
 
       {/* 3 KARTU STATISTIK */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Kartu Saldo Total */}
         <div className="p-6 rounded-2xl border shadow-sm relative overflow-hidden transition-colors bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -216,7 +212,6 @@ function DashboardContent() {
           </p>
         </div>
 
-        {/* Kartu Total Pemasukan */}
         <div className="p-6 rounded-2xl border shadow-sm relative overflow-hidden transition-colors bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -230,7 +225,6 @@ function DashboardContent() {
           <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Jumlah total dana masuk (Debit)</p>
         </div>
 
-        {/* Kartu Total Pengeluaran */}
         <div className="p-6 rounded-2xl border shadow-sm relative overflow-hidden transition-colors bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-800/80">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -243,7 +237,6 @@ function DashboardContent() {
           </div>
           <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Jumlah total dana keluar (Kredit)</p>
         </div>
-
       </div>
 
       {/* GRAFIK TREN MUTASI KAS */}
@@ -303,7 +296,7 @@ function DashboardContent() {
             <thead>
               <tr className="text-xs uppercase tracking-widest border-b bg-gray-50 text-slate-500 border-gray-200 dark:bg-[#111827] dark:text-slate-400 dark:border-slate-800">
                 <th className="py-4 px-6 font-semibold">Tanggal</th>
-                <th className="py-4 px-6 font-semibold">Deskripsi</th>
+                <th className="py-4 px-6 font-semibold">Deskripsi & Kegiatan</th>
                 <th className="py-4 px-6 font-semibold">Kategori</th>
                 <th className="py-4 px-6 font-semibold text-right">Jumlah</th>
                 {isBisaEdit && <th className="py-4 px-6 font-semibold text-center w-24">Aksi</th>}
@@ -321,7 +314,18 @@ function DashboardContent() {
                     <tr key={item.id_transaksi} className="transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/40">
                       <td className="py-4 px-6 text-sm text-slate-600 dark:text-slate-400">{item.tanggal_transaksi}</td>
                       <td className="py-4 px-6">
-                        <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{item.detail_transaksi || item.kegiatan?.nama_kegiatan || '-'}</p>
+                        <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{item.detail_transaksi || item.kategori?.nama_kategori || '-'}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          {item.divisi?.nama_divisi && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400">
+                              [{item.divisi.nama_divisi}]
+                            </span>
+                          )}
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 dark:text-cyan-400">
+                            {item.kegiatan?.nama_kegiatan || '-'}
+                            {item.sub_kegiatan?.nama_sub_kegiatan ? ` - ${item.sub_kegiatan.nama_sub_kegiatan}` : ''}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 px-6">
                         <span className="px-3 py-1 rounded-md text-xs font-bold border bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-400">
@@ -358,14 +362,27 @@ function DashboardContent() {
               return (
                 <div key={item.id_transaksi} className="p-4 flex flex-col gap-2 hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors">
                   <div className="flex justify-between items-start">
-                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200 flex-1 mr-3">
-                      {item.detail_transaksi || item.kegiatan?.nama_kegiatan || '-'}
-                    </p>
+                    <div>
+                      <p className="font-bold text-sm text-slate-800 dark:text-slate-200 flex-1 mr-3">
+                        {item.detail_transaksi || item.kategori?.nama_kategori || '-'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {item.divisi?.nama_divisi && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400">
+                            [{item.divisi.nama_divisi}]
+                          </span>
+                        )}
+                        <span className="text-[9px] font-bold uppercase text-blue-600 dark:text-cyan-400">
+                          {item.kegiatan?.nama_kegiatan || '-'}
+                          {item.sub_kegiatan?.nama_sub_kegiatan ? ` - ${item.sub_kegiatan.nama_sub_kegiatan}` : ''}
+                        </span>
+                      </div>
+                    </div>
                     <span className={`font-black text-sm whitespace-nowrap ${isPemasukan ? 'text-emerald-600 dark:text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
                       {isPemasukan ? '+' : '-'}{formatRupiah(item.jumlah)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center mt-1">
+                  <div className="flex justify-between items-center mt-2">
                     <span className="text-xs text-slate-500 dark:text-slate-400">{item.tanggal_transaksi}</span>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-400">
