@@ -3,28 +3,33 @@
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 export default function ActionButtons({ id }: { id: string }) {
   const router = useRouter();
 
-  // Fungsi untuk menghapus data
-  const handleDelete = async () => {
-    // Munculkan dialog konfirmasi sebelum menghapus
-    const isConfirm = window.confirm('Apakah Anda yakin ingin menghapus transaksi ini?');
-    
-    if (isConfirm) {
-      const { error } = await supabase
-        .from('transaksi')
-        .delete()
-        .eq('id_transaksi', id);
+  const dialog = useConfirmDialog();
 
-      if (error) {
-        alert('Gagal menghapus: ' + error.message);
-      } else {
-        alert('Data berhasil dihapus!');
-        router.refresh(); // Memuat ulang tabel di Dashboard
-      }
-    }
+  // Fungsi untuk menghapus data
+  const handleDelete = () => {
+    dialog.openDialog(
+      'Hapus Transaksi',
+      'Apakah Anda yakin ingin menghapus transaksi ini?',
+      async () => {
+        const { error } = await supabase
+          .from('transaksi')
+          .delete()
+          .eq('id_transaksi', id);
+
+        if (error) {
+          dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
+        } else {
+          dialog.showSuccess('Berhasil', 'Data berhasil dihapus!');
+          router.refresh(); // Memuat ulang tabel di Dashboard
+        }
+      },
+      { confirmText: 'Ya, Hapus', variant: 'danger' }
+    );
   };
 
   return (

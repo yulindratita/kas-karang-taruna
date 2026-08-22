@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Printer, Filter, CalendarDays, FileSpreadsheet, ChevronDown, CheckSquare, Square, Edit, Trash2, X, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Printer, Filter, CalendarDays, FileSpreadsheet, ChevronDown, CheckSquare, Square, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Divisi, Kegiatan, SubKegiatan, Kategori } from '@/types';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 export default function BukuBesar() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
   const [isLoading, setIsLoading] = useState(true);
   
   const [transaksiList, setTransaksiList] = useState<any[]>([]);
@@ -52,9 +54,6 @@ export default function BukuBesar() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false, title: '', message: '', confirmText: 'Ya, Lanjutkan', isDanger: false, onConfirm: () => {}
-  });
 
   useEffect(() => {
     const checkTheme = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -158,16 +157,17 @@ export default function BukuBesar() {
     setIsEditModalOpen(true);
   };
 
-  const handleSimpanEdit = (e: React.FormEvent) => {
+    const handleSimpanEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    setConfirmDialog({
-      isOpen: true, title: 'Simpan Perubahan', message: 'Apakah Anda yakin ingin menyimpan perubahan pada mutasi kas ini?',
-      confirmText: 'Ya, Simpan', isDanger: false, onConfirm: eksekusiSimpanEdit
-    });
+    dialog.openDialog(
+      'Simpan Perubahan',
+      'Apakah Anda yakin ingin menyimpan perubahan pada mutasi kas ini?',
+      eksekusiSimpanEdit,
+      { confirmText: 'Ya, Simpan' }
+    );
   };
 
   const eksekusiSimpanEdit = async () => {
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
     setIsSaving(true);
     const { error } = await supabase.from('transaksi').update({
       tanggal_transaksi: editForm.tanggal_transaksi,
@@ -181,28 +181,29 @@ export default function BukuBesar() {
     }).eq('id_transaksi', editForm.id_transaksi);
     
     setIsSaving(false);
-    if (error) alert('Gagal memperbarui: ' + error.message);
+    if (error) dialog.showError('Gagal', 'Gagal memperbarui: ' + error.message);
     else { setIsEditModalOpen(false); fetchTransaksi(); }
   };
 
   const handleHapus = (id: string) => {
-    setConfirmDialog({
-      isOpen: true, title: 'Hapus Transaksi', message: 'Anda yakin ingin menghapus catatan mutasi kas ini secara permanen?',
-      confirmText: 'Ya, Hapus', isDanger: true, onConfirm: () => eksekusiHapus(id)
-    });
+    dialog.openDialog(
+      'Hapus Transaksi',
+      'Anda yakin ingin menghapus catatan mutasi kas ini secara permanen?',
+      () => eksekusiHapus(id),
+      { confirmText: 'Ya, Hapus', variant: 'danger' }
+    );
   };
 
   const eksekusiHapus = async (id: string) => {
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
     const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-    if (error) alert('Gagal menghapus: ' + error.message);
+    if (error) dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
     else fetchTransaksi();
   };
 
   const handlePrintPDF = () => window.print();
 
   const handleExportExcel = () => {
-    if (transaksiList.length === 0) return alert('Tidak ada data.');
+    if (transaksiList.length === 0) return dialog.showWarning('Peringatan', 'Tidak ada data.');
     const printDate = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
     const separator = ';'; 
     let csv = `Laporan Buku Besar Kas\n`;
@@ -732,28 +733,6 @@ export default function BukuBesar() {
         </div>
       )}
 
-      {/* POP-UP KONFIRMASI KUSTOM */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm print:hidden">
-          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') : (isDarkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-600')}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className={`text-lg font-black tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{confirmDialog.title}</h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{confirmDialog.message}</p>
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-3 border-t ${isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-gray-100 bg-gray-50'}`}>
-              <button onClick={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} className={`px-4 py-2.5 rounded-xl font-bold text-sm border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-gray-300 text-gray-700'}`}>
-                Batal
-              </button>
-              <button onClick={confirmDialog.onConfirm} className={`px-4 py-2.5 rounded-xl font-bold text-sm ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500 text-white' : 'bg-rose-600 text-white') : (isDarkMode ? 'bg-cyan-500 text-slate-900' : 'bg-blue-600 text-white')}`}>
-                {confirmDialog.confirmText}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 }

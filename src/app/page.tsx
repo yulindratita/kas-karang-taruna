@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Trash2, AlertTriangle, ArrowRight, ArrowDownToLine, ArrowUpFromLine, Wallet, TrendingUp, FilterX } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -32,9 +33,7 @@ function DashboardContent() {
   const [totalMasuk, setTotalMasuk] = useState(0);
   const [totalKeluar, setTotalKeluar] = useState(0);
 
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false, title: '', message: '', confirmText: 'Ya, Lanjutkan', isDanger: false, onConfirm: () => {}
-  });
+  const dialog = useConfirmDialog();
 
   const fetchUserRole = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -151,25 +150,22 @@ function DashboardContent() {
     router.push('/');
   };
 
-  const handleHapus = (id: string) => {
+    const handleHapus = (id: string) => {
     if (!isBisaEdit) {
-      alert('Anda tidak memiliki hak akses untuk menghapus transaksi.');
+      dialog.showError('Akses Ditolak', 'Anda tidak memiliki hak akses untuk menghapus transaksi.');
       return;
     }
 
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Hapus Transaksi',
-      message: 'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.',
-      confirmText: 'Ya, Hapus',
-      isDanger: true,
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+    dialog.openDialog(
+      'Hapus Transaksi',
+      'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.',
+      async () => {
         const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-        if (error) alert('Gagal menghapus: ' + error.message);
+        if (error) dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
         else fetchDataDashboard();
-      }
-    });
+      },
+      { confirmText: 'Ya, Hapus', variant: 'danger' }
+    );
   };
 
   const formatRupiah = (angka: number) => 
@@ -401,29 +397,6 @@ function DashboardContent() {
           )}
         </div>
       </div>
-
-      {/* POP-UP KONFIRMASI KUSTOM */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-700">
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' : 'bg-blue-100 text-blue-600 dark:bg-cyan-500/20 dark:text-cyan-400'}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="text-lg font-black tracking-tight mb-2 text-gray-900 dark:text-white">{confirmDialog.title}</h3>
-              <p className="text-sm leading-relaxed text-gray-600 dark:text-slate-400">{confirmDialog.message}</p>
-            </div>
-            <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50 dark:border-slate-800 dark:bg-[#111827]">
-              <button onClick={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))} className="px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border bg-white border-gray-300 text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700">
-                Batal
-              </button>
-              <button onClick={confirmDialog.onConfirm} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? 'bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600' : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-cyan-500 dark:text-slate-900 dark:hover:bg-cyan-400'}`}>
-                {confirmDialog.confirmText}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
