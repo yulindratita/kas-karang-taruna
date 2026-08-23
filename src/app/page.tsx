@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import { Trash2, AlertTriangle, ArrowRight, ArrowDownToLine, ArrowUpFromLine, Wallet, TrendingUp, FilterX } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ function DashboardContent() {
   const [totalKeluar, setTotalKeluar] = useState(0);
 
   const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
 
   const fetchUserRole = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -152,7 +154,7 @@ function DashboardContent() {
 
     const handleHapus = (id: string) => {
     if (!isBisaEdit) {
-      dialog.showError('Akses Ditolak', 'Anda tidak memiliki hak akses untuk menghapus transaksi.');
+      showError('Anda tidak memiliki hak akses untuk menghapus transaksi.', 'Akses Ditolak');
       return;
     }
 
@@ -161,8 +163,11 @@ function DashboardContent() {
       'Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.',
       async () => {
         const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-        if (error) dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
-        else fetchDataDashboard();
+        if (error) {
+          showError('Gagal', 'Gagal menghapus: ' + error.message);
+        } else {
+          fetchDataDashboard();
+        }
       },
       { confirmText: 'Ya, Hapus', variant: 'danger' }
     );

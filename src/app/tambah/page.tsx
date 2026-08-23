@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { PlusCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { PlusCircle, ArrowLeft } from 'lucide-react';
 import { Divisi, Kegiatan, SubKegiatan, Kategori } from '@/types';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function TambahKas() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,11 +32,6 @@ export default function TambahKas() {
   const [idKategori, setIdKategori] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [detail, setDetail] = useState('');
-
-  // Confirm Dialog State
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false, title: '', message: '', confirmText: 'Ya, Simpan', isDanger: false, onConfirm: () => {}
-  });
 
   useEffect(() => {
     const checkTheme = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -77,22 +76,27 @@ export default function TambahKas() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idKegiatan) return alert('Silakan pilih kegiatan.');
-    if (!idKategori) return alert('Silakan pilih kategori.');
-    if (!jumlah || Number(jumlah) <= 0) return alert('Nominal harus lebih dari 0.');
+    if (!idKegiatan) {
+      showError('Silakan pilih kegiatan', 'Validasi Gagal');
+      return;
+    }
+    if (!idKategori) {
+      showError('Silakan pilih kategori', 'Validasi Gagal');
+      return;
+    }
+    if (!jumlah || Number(jumlah) <= 0) {
+      showError('Nominal harus lebih dari 0', 'Validasi Gagal');
+      return;
+    }
 
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Simpan Catatan Kas',
-      message: `Apakah Anda yakin ingin mencatat ${jenis.toLowerCase()} sebesar Rp ${Number(jumlah).toLocaleString('id-ID')}?`,
-      confirmText: 'Ya, Simpan',
-      isDanger: false,
-      onConfirm: eksekusiSimpan
-    });
+    dialog.openDialog(
+      'Konfirmasi Simpan',
+      `Apakah Anda yakin ingin mencatat ${jenis.toLowerCase()} sebesar Rp ${Number(jumlah).toLocaleString('id-ID')}?`,
+      eksekusiSimpan
+    );
   };
 
   const eksekusiSimpan = async () => {
-    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
     setIsLoading(true);
 
     const payload = {
@@ -110,8 +114,9 @@ export default function TambahKas() {
 
     setIsLoading(false);
     if (error) {
-      alert('Gagal menyimpan catatan kas: ' + error.message);
+      showError(error.message, 'Gagal Menyimpan Transaksi');
     } else {
+      showSuccess('Transaksi Berhasil Disimpan!', 'Berhasil');
       router.push('/laporan');
     }
   };
@@ -298,24 +303,6 @@ export default function TambahKas() {
         </div>
       </div>
 
-      {/* Pop-up Konfirmasi */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${isDarkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-600'}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className={`text-lg font-black tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{confirmDialog.title}</h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{confirmDialog.message}</p>
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-3 border-t ${isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-gray-100 bg-gray-50'}`}>
-              <button onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))} className={`px-4 py-2.5 rounded-xl font-bold text-sm border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-gray-300 text-gray-700'}`}>Batal</button>
-              <button onClick={confirmDialog.onConfirm} className={`px-4 py-2.5 rounded-xl font-bold text-sm ${isDarkMode ? 'bg-cyan-500 text-slate-900' : 'bg-blue-600 text-white'}`}>{confirmDialog.confirmText}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 }

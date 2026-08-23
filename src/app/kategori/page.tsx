@@ -3,9 +3,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
-import { PlusCircle, Edit, Trash2, X, Tags, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, X, Tags, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function KelolaKategori() {
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
+
   const [kategori, setKategori] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -15,16 +20,6 @@ export default function KelolaKategori() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({ id_kategori: '', nama_kategori: '', jenis: 'Pemasukan' });
-
-  // State Pop-up Konfirmasi Kustom
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Ya, Lanjutkan',
-    isDanger: false,
-    onConfirm: () => {}
-  });
 
   useEffect(() => {
     const checkTheme = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -58,26 +53,33 @@ export default function KelolaKategori() {
   // --- ALUR SIMPAN ---
   const handleSimpan = (e: React.FormEvent) => {
     e.preventDefault();
-    setConfirmDialog({
-      isOpen: true,
-      title: isEditMode ? 'Konfirmasi Edit' : 'Tambah Kategori Baru',
-      message: isEditMode ? 'Yakin ingin menyimpan perubahan pada kategori ini?' : 'Yakin ingin menambahkan kategori ini ke dalam sistem?',
-      confirmText: 'Ya, Simpan',
-      isDanger: false,
-      onConfirm: eksekusiSimpan
-    });
+    dialog.openDialog(
+      isEditMode ? 'Konfirmasi Edit' : 'Tambah Kategori Baru',
+      isEditMode ? 'Yakin ingin menyimpan perubahan pada kategori ini?' : 'Yakin ingin menambahkan kategori ini ke dalam sistem?',
+      eksekusiSimpan,
+      { confirmText: 'Ya, Simpan' }
+    );
   };
 
   const eksekusiSimpan = async () => {
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
     setIsSaving(true);
 
     if (isEditMode) {
       const { error } = await supabase.from('kategori').update({ nama_kategori: form.nama_kategori, jenis: form.jenis }).eq('id_kategori', form.id_kategori);
-      if (error) alert('Gagal mengedit: ' + error.message);
+      if (error) {
+        showError(error.message, 'Gagal Mengedit Kategori');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Data kategori berhasil diperbarui', 'Berhasil');
     } else {
       const { error } = await supabase.from('kategori').insert([{ nama_kategori: form.nama_kategori, jenis: form.jenis }]);
-      if (error) alert('Gagal menambah: ' + error.message);
+      if (error) {
+        showError(error.message, 'Gagal Menambah Kategori');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Data kategori berhasil ditambahkan', 'Berhasil');
     }
 
     setIsSaving(false);
@@ -87,21 +89,22 @@ export default function KelolaKategori() {
 
   // --- ALUR HAPUS ---
   const handleHapus = (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Hapus Kategori Permanen',
-      message: 'Peringatan: Kategori yang dihapus akan membuat data transaksi lama terkait menjadi tidak berkategori. Apakah Anda yakin?',
-      confirmText: 'Ya, Tetap Hapus',
-      isDanger: true,
-      onConfirm: () => eksekusiHapus(id)
-    });
+    dialog.openDialog(
+      'Hapus Kategori Permanen',
+      'Peringatan: Kategori yang dihapus akan membuat data transaksi lama terkait menjadi tidak berkategori. Apakah Anda yakin?',
+      () => eksekusiHapus(id),
+      { confirmText: 'Ya, Tetap Hapus', variant: 'danger' }
+    );
   };
 
   const eksekusiHapus = async (id: string) => {
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
     const { error } = await supabase.from('kategori').delete().eq('id_kategori', id);
-    if (error) alert('Gagal menghapus: ' + error.message);
-    else fetchKategori();
+    if (error) {
+      showError(error.message, 'Gagal Menghapus Kategori');
+    } else {
+      showSuccess('Data kategori berhasil dihapus', 'Berhasil');
+      fetchKategori();
+    }
   };
 
   return (
@@ -183,29 +186,6 @@ export default function KelolaKategori() {
                 <button type="submit" disabled={isSaving} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 ${isDarkMode ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{isSaving ? 'Menyimpan...' : 'Simpan'}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* POP-UP KONFIRMASI KUSTOM */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') : (isDarkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-600')}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className={`text-lg font-black tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{confirmDialog.title}</h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{confirmDialog.message}</p>
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-3 border-t ${isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-gray-100 bg-gray-50'}`}>
-              <button onClick={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
-                Batal
-              </button>
-              <button onClick={confirmDialog.onConfirm} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-rose-600 text-white hover:bg-rose-700') : (isDarkMode ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400' : 'bg-blue-600 text-white hover:bg-blue-700')}`}>
-                {confirmDialog.confirmText}
-              </button>
-            </div>
           </div>
         </div>
       )}

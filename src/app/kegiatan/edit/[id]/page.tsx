@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import Link from 'next/link';
 
 export default function EditKegiatan() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const params = useParams();
   const id = params.id;
 
@@ -31,6 +35,10 @@ export default function EditKegiatan() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!namaKegiatan.trim()) {
+      showError('Nama kegiatan tidak boleh kosong', 'Validasi Gagal');
+      return;
+    }
     setIsLoading(true);
 
     const { error } = await supabase
@@ -41,10 +49,10 @@ export default function EditKegiatan() {
     setIsLoading(false);
 
     if (error) {
-      alert('Gagal mengupdate: ' + error.message);
+      showError(error.message, 'Gagal Mengupdate Kegiatan');
     } else {
-      alert('Kategori Kegiatan Berhasil Diperbarui!');
-      router.push('/kegiatan'); // Kembali ke daftar kegiatan
+      showSuccess('Kegiatan Berhasil Diperbarui!', 'Berhasil');
+      router.push('/kegiatan');
     }
   };
 

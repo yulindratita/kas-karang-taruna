@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Plus, Edit, Trash2, X, AlertTriangle, FolderTree } from 'lucide-react';
+import { Plus, Edit, Trash2, X, FolderTree } from 'lucide-react';
 import { Kegiatan, SubKegiatan } from '@/types';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function KelolaSubKegiatan() {
   // === STATE MANAGEMENT ===
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [subKegiatanList, setSubKegiatanList] = useState<SubKegiatan[]>([]);
   const [kegiatanList, setKegiatanList] = useState<Kegiatan[]>([]); // Untuk dropdown pilih Induk
   const [isLoading, setIsLoading] = useState(true);
@@ -21,11 +25,6 @@ export default function KelolaSubKegiatan() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Confirm Dialog State
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false, title: '', message: '', confirmText: 'Ya', isDanger: false, onConfirm: () => {}
-  });
 
   // === EFFECTS ===
   useEffect(() => {
@@ -80,8 +79,14 @@ export default function KelolaSubKegiatan() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idKegiatan) return alert('Silakan pilih induk kegiatan terlebih dahulu');
-    if (!namaSubKegiatan.trim()) return alert('Nama sub kegiatan tidak boleh kosong');
+    if (!idKegiatan) {
+      showError('Silakan pilih induk kegiatan terlebih dahulu', 'Validasi Gagal');
+      return;
+    }
+    if (!namaSubKegiatan.trim()) {
+      showError('Nama sub kegiatan tidak boleh kosong', 'Validasi Gagal');
+      return;
+    }
 
     setIsSaving(true);
     if (editItem) {
@@ -90,13 +95,25 @@ export default function KelolaSubKegiatan() {
         .from('sub_kegiatan')
         .update({ id_kegiatan: idKegiatan, nama_sub_kegiatan: namaSubKegiatan.trim() })
         .eq('id_sub_kegiatan', editItem.id_sub_kegiatan);
-      if (error) alert('Gagal memperbarui: ' + error.message);
+
+      if (error) {
+        showError(error.message, 'Gagal Memperbarui Sub Kegiatan');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Sub kegiatan berhasil diperbarui', 'Berhasil');
     } else {
       // INSERT DATA
       const { error } = await supabase
         .from('sub_kegiatan')
         .insert([{ id_kegiatan: idKegiatan, nama_sub_kegiatan: namaSubKegiatan.trim() }]);
-      if (error) alert('Gagal menambah: ' + error.message);
+
+      if (error) {
+        showError(error.message, 'Gagal Menambah Sub Kegiatan');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Sub kegiatan berhasil ditambahkan', 'Berhasil');
     }
     
     setIsSaving(false);
@@ -105,19 +122,20 @@ export default function KelolaSubKegiatan() {
   };
 
   const handleHapus = (item: SubKegiatan) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Hapus Sub Kegiatan',
-      message: `Yakin ingin menghapus sub-kegiatan "${item.nama_sub_kegiatan}"?`,
-      confirmText: 'Ya, Hapus',
-      isDanger: true,
-      onConfirm: async () => {
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+    dialog.openDialog(
+      'Konfirmasi Hapus',
+      `Yakin ingin menghapus sub-kegiatan "${item.nama_sub_kegiatan}"?`,
+      async () => {
         const { error } = await supabase.from('sub_kegiatan').delete().eq('id_sub_kegiatan', item.id_sub_kegiatan);
-        if (error) alert('Gagal menghapus: ' + error.message);
-        else fetchInitialData();
-      }
-    });
+        if (error) {
+          showError(error.message, 'Gagal Menghapus Sub Kegiatan');
+        } else {
+          showSuccess('Sub kegiatan berhasil dihapus', 'Berhasil');
+          fetchInitialData();
+        }
+      },
+      { variant: 'danger' }
+    );
   };
 
   const isBisaEdit = userRole === 'SUPER_ADMIN' || userRole === 'BENDAHARA';
@@ -235,23 +253,7 @@ export default function KelolaSubKegiatan() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Modal Konfirmasi Hapus */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          {/* ... (Struktur modal sama dengan modal Divisi) ... */}
-          <div className={`w-full max-w-sm rounded-2xl p-6 border ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
-             <div className="flex justify-center mb-4"><AlertTriangle className="text-rose-500" size={32} /></div>
-             <h3 className={`text-center font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>{confirmDialog.title}</h3>
-             <p className={`text-center text-sm mb-6 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{confirmDialog.message}</p>
-             <div className="flex justify-center gap-3">
-               <button onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))} className={`px-4 py-2 rounded-xl font-bold text-sm border ${isDarkMode ? 'text-white' : 'text-black'}`}>Batal</button>
-               <button onClick={confirmDialog.onConfirm} className="px-4 py-2 rounded-xl font-bold text-sm bg-rose-600 text-white">{confirmDialog.confirmText}</button>
-             </div>
-          </div>
-        </div>
-      )}
+            )}
     </DashboardLayout>
   );
 }

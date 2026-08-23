@@ -3,10 +3,14 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import Link from 'next/link';
 
 export default function Login() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +31,9 @@ export default function Login() {
 
     if (error) {
       setErrorMsg(error.message);
+      showError(error.message, 'Gagal Login');
     } else {
-      alert('Login Berhasil!');
+      showSuccess('Login Berhasil!', 'Berhasil');
       router.push('/'); // Kembali ke dashboard setelah sukses
       router.refresh();
     }

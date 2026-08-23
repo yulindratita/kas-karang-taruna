@@ -7,10 +7,12 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { Printer, Filter, CalendarDays, FileSpreadsheet, ChevronDown, CheckSquare, Square, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Divisi, Kegiatan, SubKegiatan, Kategori } from '@/types';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function BukuBesar() {
   const router = useRouter();
   const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
   const [transaksiList, setTransaksiList] = useState<any[]>([]);
@@ -181,8 +183,13 @@ export default function BukuBesar() {
     }).eq('id_transaksi', editForm.id_transaksi);
     
     setIsSaving(false);
-    if (error) dialog.showError('Gagal', 'Gagal memperbarui: ' + error.message);
-    else { setIsEditModalOpen(false); fetchTransaksi(); }
+    if (error) {
+      showError(error.message, 'Gagal Memperbarui Transaksi');
+    } else {
+      showSuccess('Transaksi berhasil diperbarui', 'Berhasil');
+      setIsEditModalOpen(false);
+      fetchTransaksi();
+    }
   };
 
   const handleHapus = (id: string) => {
@@ -196,14 +203,18 @@ export default function BukuBesar() {
 
   const eksekusiHapus = async (id: string) => {
     const { error } = await supabase.from('transaksi').delete().eq('id_transaksi', id);
-    if (error) dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
-    else fetchTransaksi();
+    if (error) {
+      showError(error.message, 'Gagal Menghapus Transaksi');
+    } else {
+      showSuccess('Transaksi berhasil dihapus', 'Berhasil');
+      fetchTransaksi();
+    }
   };
 
   const handlePrintPDF = () => window.print();
 
   const handleExportExcel = () => {
-    if (transaksiList.length === 0) return dialog.showWarning('Peringatan', 'Tidak ada data.');
+    if (transaksiList.length === 0) { showError('Tidak ada data untuk diekspor', 'Peringatan'); return; }
     const printDate = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
     const separator = ';'; 
     let csv = `Laporan Buku Besar Kas\n`;

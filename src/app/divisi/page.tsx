@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Plus, Edit, Trash2, X, AlertTriangle, Building2 } from 'lucide-react';
 import { Divisi } from '@/types';
+import { useToast } from '@/hooks/useToast';
 
 export default function KelolaDivisi() {
   // === STATE MANAGEMENT ===
@@ -23,6 +24,9 @@ export default function KelolaDivisi() {
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false, title: '', message: '', confirmText: 'Ya', isDanger: false, onConfirm: () => {}
   });
+
+  // Toast notifications
+  const { showSuccess, showError } = useToast();
 
   // === EFFECTS ===
   // Cek tema (Dark/Light mode) saat komponen dimuat
@@ -72,17 +76,30 @@ export default function KelolaDivisi() {
   // Proses Simpan Data (CREATE & UPDATE)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!namaDivisi.trim()) return alert('Nama divisi tidak boleh kosong');
+    if (!namaDivisi.trim()) {
+      showError('Nama divisi tidak boleh kosong', 'Validasi Gagal');
+      return;
+    }
 
     setIsSaving(true);
     if (editItem) {
       // Logika Update (jika editItem tidak null)
       const { error } = await supabase.from('divisi').update({ nama_divisi: namaDivisi.trim() }).eq('id_divisi', editItem.id_divisi);
-      if (error) alert('Gagal mengubah divisi: ' + error.message);
+      if (error) {
+        showError(error.message, 'Gagal Mengubah Divisi');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Data divisi berhasil diperbarui', 'Berhasil');
     } else {
       // Logika Insert/Tambah Baru
       const { error } = await supabase.from('divisi').insert([{ nama_divisi: namaDivisi.trim() }]);
-      if (error) alert('Gagal menambah divisi: ' + error.message);
+      if (error) {
+        showError(error.message, 'Gagal Menambah Divisi');
+        setIsSaving(false);
+        return;
+      }
+      showSuccess('Data divisi berhasil ditambahkan', 'Berhasil');
     }
     
     // Reset state & fetch ulang data terbaru
@@ -102,8 +119,12 @@ export default function KelolaDivisi() {
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false })); // Tutup dialog
         const { error } = await supabase.from('divisi').delete().eq('id_divisi', item.id_divisi);
-        if (error) alert('Gagal menghapus: ' + error.message);
-        else fetchDivisi();
+        if (error) {
+          showError(error.message, 'Gagal Menghapus Divisi');
+        } else {
+          showSuccess('Data divisi berhasil dihapus', 'Berhasil');
+          fetchDivisi();
+        }
       }
     });
   };

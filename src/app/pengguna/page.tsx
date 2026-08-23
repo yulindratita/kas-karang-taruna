@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { ShieldCheck, Edit, X, Users, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Edit, X, Users } from 'lucide-react';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function KelolaPengguna() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [pengguna, setPengguna] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -16,16 +20,6 @@ export default function KelolaPengguna() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({ id: '', nama_lengkap: '', role: 'PENGAWAS' });
-
-  // State Modal Konfirmasi Kustom
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Ya, Lanjutkan',
-    isDanger: false,
-    onConfirm: () => {}
-  });
 
   useEffect(() => {
     const checkTheme = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -45,7 +39,7 @@ export default function KelolaPengguna() {
     
     const { data: currentUser } = await supabase.from('users_profile').select('role').eq('id', session.user.id).single();
     if (currentUser?.role !== 'SUPER_ADMIN') {
-      alert('Akses Ditolak! Hanya Super Admin yang diizinkan masuk ke halaman ini.');
+      showError('Hanya Super Admin yang diizinkan masuk ke halaman ini.', 'Akses Ditolak');
       router.push('/');
       return;
     }
@@ -62,24 +56,17 @@ export default function KelolaPengguna() {
     setIsModalOpen(true);
   };
 
-  // TAHAP 1: Cegah submit otomatis, panggil Pop-up Konfirmasi
   const handleSimpanEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Konfirmasi Perubahan',
-      message: `Anda yakin ingin mengubah hak akses pengguna ini menjadi ${form.role}? Akses akan langsung berlaku.`,
-      confirmText: 'Ya, Simpan',
-      isDanger: false,
-      onConfirm: eksekusiSimpanDatabase
-    });
+    dialog.openDialog(
+      'Konfirmasi Perubahan',
+      `Anda yakin ingin mengubah hak akses pengguna ini menjadi ${form.role}? Akses akan langsung berlaku.`,
+      eksekusiSimpanDatabase,
+      { confirmText: 'Ya, Simpan' }
+    );
   };
 
-  // TAHAP 2: Jika tombol "Ya, Simpan" di Pop-up diklik
   const eksekusiSimpanDatabase = async () => {
-    // Tutup pop-up konfirmasi
-    setConfirmDialog({ ...confirmDialog, isOpen: false });
-    
     setIsSaving(true);
     const { error } = await supabase
       .from('users_profile')
@@ -89,8 +76,9 @@ export default function KelolaPengguna() {
     setIsSaving(false);
 
     if (error) {
-      alert('Gagal mengupdate pengguna: ' + error.message);
+      showError(error.message, 'Gagal Mengupdate Pengguna');
     } else {
+      showSuccess('Pengguna berhasil diperbarui', 'Berhasil');
       setIsModalOpen(false);
       fetchPengguna();
     }
@@ -181,39 +169,6 @@ export default function KelolaPengguna() {
                 <button type="submit" disabled={isSaving} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 ${isDarkMode ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* POP-UP KONFIRMASI KUSTOM (Pengganti window.confirm) */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 ${isDarkMode ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-200'}`}>
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') : (isDarkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-600')}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className={`text-lg font-black tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                {confirmDialog.title}
-              </h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                {confirmDialog.message}
-              </p>
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-3 border-t ${isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-gray-100 bg-gray-50'}`}>
-              <button 
-                onClick={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} 
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}
-              >
-                Batal
-              </button>
-              <button 
-                onClick={confirmDialog.onConfirm} 
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? (isDarkMode ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-rose-600 text-white hover:bg-rose-700') : (isDarkMode ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400' : 'bg-blue-600 text-white hover:bg-blue-700')}`}
-              >
-                {confirmDialog.confirmText}
-              </button>
-            </div>
           </div>
         </div>
       )}

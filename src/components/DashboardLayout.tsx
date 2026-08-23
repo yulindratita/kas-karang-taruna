@@ -9,6 +9,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 function HeaderFilters() {
   const router = useRouter();
@@ -118,25 +120,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // FIX HYDRATION ERROR: Tambahkan state isMounted
+    // FIX HYDRATION ERROR: Tambahkan state isMounted
   const [isMounted, setIsMounted] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true); // Default statis untuk server render
+
+    // Global dialog for confirmations and notifications
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
 
   // State untuk Pop-up Login
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  // State Pop-up Konfirmasi Kustom
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Ya, Lanjutkan',
-    isDanger: false,
-    onConfirm: () => {}
-  });
 
   // FIX HYDRATION ERROR: Pindahkan pembacaan localStorage ke useEffect
   useEffect(() => {
@@ -172,9 +168,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!user) return;
     let timeoutId: NodeJS.Timeout;
     const logoutWaktuHabis = async () => {
-      await supabase.auth.signOut();
-      alert('Sesi Anda telah berakhir karena tidak ada aktivitas.');
-      window.location.reload(); 
+            await supabase.auth.signOut();
+      showError('Sesi Anda telah berakhir karena tidak ada aktivitas.', 'Sesi Berakhir');
+      window.location.reload();
     };
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -217,10 +213,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setIsLoggingIn(false);
 
     if (error) {
-      alert('Login gagal: ' + error.message);
+      showError(error.message, 'Login Gagal');
     } else {
+      showSuccess('Login berhasil! Selamat datang.', 'Selamat Datang');
       setIsLoginModalOpen(false);
-      window.location.reload(); 
+      window.location.reload();
     }
   };
 
@@ -233,19 +230,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  const handleLogout = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Konfirmasi Keluar',
-      message: 'Apakah Anda yakin ingin keluar dari akun Anda? Anda harus login kembali untuk mengelola data.',
-      confirmText: 'Ya, Keluar',
-      isDanger: true,
-      onConfirm: eksekusiLogout
-    });
+    const handleLogout = () => {
+    dialog.openDialog(
+      'Konfirmasi Keluar',
+      'Apakah Anda yakin ingin keluar dari akun Anda? Anda harus login kembali untuk mengelola data.',
+      eksekusiLogout,
+      { variant: 'confirm', confirmText: 'Ya, Keluar' }
+    );
   };
 
   const eksekusiLogout = async () => {
-    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
     await supabase.auth.signOut();
     window.location.href = '/'; 
   };
@@ -261,8 +255,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const role = userProfil?.role?.toUpperCase() || '';
   const isBisaEdit = role === 'SUPER_ADMIN' || role === 'BENDAHARA';
 
-  return (
+    return (
     <div className="flex h-screen overflow-hidden font-sans transition-colors duration-300 bg-gray-50 text-slate-900 dark:bg-[#090e17] dark:text-gray-100">
+      
       
       <div className={`fixed top-0 left-0 h-1 bg-cyan-500 z-[100] transition-all duration-300 ease-out ${isPageLoading ? 'w-full opacity-100' : 'w-0 opacity-0'}`} />
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
@@ -389,39 +384,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {isLoggingIn ? 'Memverifikasi...' : 'Masuk Sekarang'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* POP-UP KONFIRMASI KUSTOM (Untuk Logout & Konfirmasi Lainnya) */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border transform transition-transform scale-100 bg-white border-gray-200 dark:bg-[#0f172a] dark:border-slate-700">
-            <div className="p-6">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmDialog.isDanger ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' : 'bg-blue-100 text-blue-600 dark:bg-cyan-500/20 dark:text-cyan-400'}`}>
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="text-lg font-black tracking-tight mb-2 text-gray-900 dark:text-white">
-                {confirmDialog.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-600 dark:text-slate-400">
-                {confirmDialog.message}
-              </p>
-            </div>
-            <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50 dark:border-slate-800 dark:bg-[#111827]">
-              <button 
-                onClick={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))} 
-                className="px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border bg-white border-gray-300 text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
-              >
-                Batal
-              </button>
-              <button 
-                onClick={confirmDialog.onConfirm} 
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm ${confirmDialog.isDanger ? 'bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600' : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-cyan-500 dark:text-slate-900 dark:hover:bg-cyan-400'}`}
-              >
-                {confirmDialog.confirmText}
-              </button>
-            </div>
           </div>
         </div>
       )}

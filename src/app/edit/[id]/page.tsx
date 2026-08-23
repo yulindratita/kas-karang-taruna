@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import Link from 'next/link';
 
 export default function EditTransaksi() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const params = useParams(); 
   const id = params.id; // Mengambil ID dari URL
 
@@ -69,9 +73,9 @@ export default function EditTransaksi() {
     setIsLoading(false);
 
     if (error) {
-      alert('Gagal mengupdate: ' + error.message);
+      showError(error.message, 'Gagal Mengupdate Transaksi');
     } else {
-      alert('Transaksi Berhasil Diperbarui!');
+      showSuccess('Transaksi Berhasil Diperbarui!', 'Berhasil');
       router.push('/');
       router.refresh();
     }

@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 
 export default function ActionButtons({ id }: { id: string }) {
   const router = useRouter();
 
   const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
 
   // Fungsi untuk menghapus data
   const handleDelete = () => {
@@ -22,9 +24,9 @@ export default function ActionButtons({ id }: { id: string }) {
           .eq('id_transaksi', id);
 
         if (error) {
-          dialog.showError('Gagal', 'Gagal menghapus: ' + error.message);
+          showError(error.message, 'Gagal Menghapus Transaksi');
         } else {
-          dialog.showSuccess('Berhasil', 'Data berhasil dihapus!');
+          showSuccess('Data berhasil dihapus!', 'Berhasil');
           router.refresh(); // Memuat ulang tabel di Dashboard
         }
       },

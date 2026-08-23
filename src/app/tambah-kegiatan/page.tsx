@@ -3,15 +3,23 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useToast } from '@/hooks/useToast';
 import Link from 'next/link';
 
 export default function TambahKegiatan() {
   const router = useRouter();
+  const dialog = useConfirmDialog();
+  const { showSuccess, showError } = useToast();
   const [namaKegiatan, setNamaKegiatan] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!namaKegiatan.trim()) {
+      showError('Nama kegiatan tidak boleh kosong', 'Validasi Gagal');
+      return;
+    }
     setIsLoading(true);
 
     const { error } = await supabase
@@ -21,9 +29,9 @@ export default function TambahKegiatan() {
     setIsLoading(false);
 
     if (error) {
-      alert('Gagal menyimpan kegiatan: ' + error.message);
+      showError(error.message, 'Gagal Menyimpan Kegiatan');
     } else {
-      alert('Kategori Kegiatan Berhasil Ditambahkan!');
+      showSuccess('Kegiatan Berhasil Ditambahkan!', 'Berhasil');
       router.push('/');
       router.refresh();
     }
